@@ -44,7 +44,17 @@ const wl_shell_surface_listener WaylandDisplay::kShellSurfaceListener = {
                     uint32_t edges,
                     int32_t width,
                     int32_t height) -> void {
-      FLWAY_ERROR << "Unhandled resize." << std::endl;
+      WaylandDisplay *wd = reinterpret_cast<WaylandDisplay *>(data);
+
+      if (wd == nullptr)
+        return;
+
+      if (wd->window_ == nullptr)
+        return;
+
+      wl_egl_window_resize(wd->window_, width, height, 0, 0);
+
+      FLWAY_LOG << "Window resized: " << width << "x" << height << std::endl;
     },
 
     .popup_done = [](void* data,
