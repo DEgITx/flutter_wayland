@@ -48,7 +48,7 @@ bool FileExistsAtPath(const std::string& path) {
 
 bool FlutterAssetBundleIsValid(const std::string& bundle_path) {
   if (!FileExistsAtPath(bundle_path)) {
-    FLWAY_ERROR << "Bundle directory does not exist." << std::endl;
+    FLWAY_ERROR << "Bundle directory: '" << bundle_path << "' does not exist." << std::endl;
     return false;
   }
 
