@@ -41,13 +41,13 @@ asset_bundle_path: The Flutter application code needs to be snapshotted using
 }
 
 static bool Main(std::vector<std::string> args) {
-  if (args.size() == 0) {
+  if (args.size() == 1) {
     std::cerr << "   <Invalid Arguments>   " << std::endl;
     PrintUsage();
     return false;
   }
 
-  const auto asset_bundle_path = args[0];
+  const auto asset_bundle_path = args[1];
 
   if (!FlutterAssetBundleIsValid(asset_bundle_path)) {
     std::cerr << "   <Invalid Flutter Asset Bundle>   " << std::endl;
@@ -89,7 +89,7 @@ static bool Main(std::vector<std::string> args) {
 
 int main(int argc, char* argv[]) {
   std::vector<std::string> args;
-  for (int i = 1; i < argc; ++i) {
+  for (int i = 0; i < argc; ++i) {
     args.push_back(argv[i]);
   }
   return flutter::Main(std::move(args)) ? EXIT_SUCCESS : EXIT_FAILURE;
