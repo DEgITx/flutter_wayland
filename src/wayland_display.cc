@@ -205,44 +205,6 @@ static void LogLastEGLError() {
 }
 
 bool WaylandDisplay::SetupEGL() {
-  if (!compositor_ || !shell_) {
-    FLWAY_ERROR << "EGL setup needs missing compositor and shell connection."
-                << std::endl;
-    return false;
-  }
-
-  surface_ = wl_compositor_create_surface(compositor_);
-
-  if (!surface_) {
-    FLWAY_ERROR << "Could not create compositor surface." << std::endl;
-    return false;
-  }
-
-  shell_surface_ = wl_shell_get_shell_surface(shell_, surface_);
-
-  if (!shell_surface_) {
-    FLWAY_ERROR << "Could not shell surface." << std::endl;
-    return false;
-  }
-
-  wl_shell_surface_add_listener(shell_surface_, &kShellSurfaceListener, this);
-
-  wl_shell_surface_set_title(shell_surface_, "Flutter");
-
-  wl_shell_surface_set_toplevel(shell_surface_);
-
-  window_ = wl_egl_window_create(surface_, screen_width_, screen_height_);
-
-  if (!window_) {
-    FLWAY_ERROR << "Could not create EGL window." << std::endl;
-    return false;
-  }
-
-  if (eglBindAPI(EGL_OPENGL_ES_API) != EGL_TRUE) {
-    LogLastEGLError();
-    FLWAY_ERROR << "Could not bind the ES API." << std::endl;
-    return false;
-  }
 
   egl_display_ = eglGetDisplay(display_);
   if (egl_display_ == EGL_NO_DISPLAY) {
@@ -254,6 +216,12 @@ bool WaylandDisplay::SetupEGL() {
   if (eglInitialize(egl_display_, nullptr, nullptr) != EGL_TRUE) {
     LogLastEGLError();
     FLWAY_ERROR << "Could not initialize EGL display." << std::endl;
+    return false;
+  }
+
+  if (eglBindAPI(EGL_OPENGL_ES_API) != EGL_TRUE) {
+    LogLastEGLError();
+    FLWAY_ERROR << "Could not bind the ES API." << std::endl;
     return false;
   }
 
@@ -292,6 +260,54 @@ bool WaylandDisplay::SetupEGL() {
     }
   }
 
+  // Create an EGL context with the match config.
+  {
+    const EGLint attribs[] = {EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE};
+
+    egl_context_ = eglCreateContext(egl_display_, egl_config,
+                                    nullptr /* share group */, attribs);
+
+    if (egl_context_ == EGL_NO_CONTEXT) {
+      LogLastEGLError();
+      FLWAY_ERROR << "Could not create an onscreen context." << std::endl;
+      return false;
+    }
+  }
+
+  if (!compositor_ || !shell_) {
+    FLWAY_ERROR << "EGL setup needs missing compositor and shell connection."
+                << std::endl;
+    return false;
+  }
+
+  surface_ = wl_compositor_create_surface(compositor_);
+
+  if (!surface_) {
+    FLWAY_ERROR << "Could not create compositor surface." << std::endl;
+    return false;
+  }
+
+  shell_surface_ = wl_shell_get_shell_surface(shell_, surface_);
+
+  if (!shell_surface_) {
+    FLWAY_ERROR << "Could not shell surface." << std::endl;
+    return false;
+  }
+
+  wl_shell_surface_add_listener(shell_surface_, &kShellSurfaceListener, this);
+
+  wl_shell_surface_set_title(shell_surface_, "Flutter");
+
+  wl_shell_surface_set_toplevel(shell_surface_);
+
+  window_ = wl_egl_window_create(surface_, screen_width_, screen_height_);
+
+  if (!window_) {
+    FLWAY_ERROR << "Could not create EGL window." << std::endl;
+    return false;
+  }
+
+
   // Create an EGL window surface with the matched config.
   {
     const EGLint attribs[] = {EGL_NONE};
@@ -307,19 +323,6 @@ bool WaylandDisplay::SetupEGL() {
     }
   }
 
-  // Create an EGL context with the match config.
-  {
-    const EGLint attribs[] = {EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE};
-
-    egl_context_ = eglCreateContext(egl_display_, egl_config,
-                                    nullptr /* share group */, attribs);
-
-    if (egl_context_ == EGL_NO_CONTEXT) {
-      LogLastEGLError();
-      FLWAY_ERROR << "Could not create an onscreen context." << std::endl;
-      return false;
-    }
-  }
 
   return true;
 }
