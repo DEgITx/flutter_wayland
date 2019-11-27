@@ -2,67 +2,58 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-cmake_minimum_required(VERSION 3.5.2)
+cmake_minimum_required(VERSION 3.3)
 
-project(flutter_wayland)
-
-set(FLUTTER_ENGINE_SHA b9523318caa1a99ffde8adaf331212eb879cabc9)
-
-set(FLUTTER_EMBEDDER_ARTIFACTS_ZIP ${CMAKE_BINARY_DIR}/flutter_embedder_${FLUTTER_ENGINE_SHA}.zip)
-set(FLUTTER_ARTIFACTS_ZIP          ${CMAKE_BINARY_DIR}/flutter_artifact_${FLUTTER_ENGINE_SHA}.zip)
-set(FLUTTER_BUCKET_BASE "https://storage.googleapis.com/flutter_infra/flutter")
-
-# Download and setup the Flutter Engine.
-if(NOT EXISTS ${FLUTTER_EMBEDDER_ARTIFACTS_ZIP})
-  file(DOWNLOAD
-    ${FLUTTER_BUCKET_BASE}/${FLUTTER_ENGINE_SHA}/linux-x64/linux-x64-embedder
-    ${FLUTTER_EMBEDDER_ARTIFACTS_ZIP}
-    SHOW_PROGRESS
-  )
-  execute_process(
-    COMMAND ${CMAKE_COMMAND} -E tar xzf ${FLUTTER_EMBEDDER_ARTIFACTS_ZIP}
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-  )
-endif()
-
-if(NOT EXISTS ${FLUTTER_ARTIFACTS_ZIP})
-  file(DOWNLOAD
-    ${FLUTTER_BUCKET_BASE}/${FLUTTER_ENGINE_SHA}/linux-x64/artifacts.zip
-    ${FLUTTER_ARTIFACTS_ZIP}
-    SHOW_PROGRESS
-  )
-  execute_process(
-    COMMAND ${CMAKE_COMMAND} -E tar xzf ${FLUTTER_ARTIFACTS_ZIP}
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-  )
-endif()
+project(flutter-launcher-wayland)
 
 find_package(PkgConfig)
-pkg_check_modules(WAYLAND_CLIENT REQUIRED wayland-client)
-pkg_check_modules(WAYLAND_EGL    REQUIRED wayland-egl)
-pkg_check_modules(EGL            REQUIRED egl)
+pkg_search_module(EGL egl REQUIRED)
+pkg_search_module(WAYLAND_CLIENT wayland-client REQUIRED)
+pkg_search_module(WAYLAND_EGL wayland-egl REQUIRED)
+# If you do not have flutter-engine.pc file
+# just provide all FLUTTER_ENGINE* variables using -D
+pkg_search_module(FLUTTER_ENGINE flutter-engine)
 
-# Executable
-file(GLOB_RECURSE FLUTTER_WAYLAND_SRC
-  "src/*.cc"
-  "src/*.h"
+if (CMAKE_VERSION VERSION_LESS "3.8.2")
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
+else()
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+  set(CMAKE_CXX_EXTENSIONS OFF)
+endif()
+
+set(SOURCES
+    src/flutter_application.cc
+    src/main.cc
+    src/utils.cc
+    src/wayland_display.cc
+    src/macros.h
+    src/utils.h
+    src/wayland_display.h
 )
 
-link_directories(${CMAKE_BINARY_DIR})
-
-add_executable(flutter_wayland ${FLUTTER_WAYLAND_SRC})
-
-target_link_libraries(flutter_wayland
-  ${WAYLAND_CLIENT_LIBRARIES}
-  ${WAYLAND_EGL_LIBRARIES}
-  ${EGL_LIBRARIES}
-  flutter_engine
+link_directories(
+    ${EGL_LIBRARY_DIRS}
+    ${WAYLAND_CLIENT_LIBRARY_DIRS}
+    ${WAYLAND_EGL_LIBRARY_DIRS}
+    ${FLUTTER_ENGINE_LIBRARY_DIRS}
 )
 
-target_include_directories(flutter_wayland
+add_executable(flutter-launcher-wayland ${SOURCES})
+
+target_include_directories(flutter-launcher-wayland
   PRIVATE
+  ${EGL_INCLUDE_DIRS}
   ${WAYLAND_CLIENT_INCLUDE_DIRS}
   ${WAYLAND_EGL_INCLUDE_DIRS}
-  ${EGL_INCLUDE_DIRS}
-  ${CMAKE_BINARY_DIR}
+  ${FLUTTER_ENGINE_INCLUDE_DIRS}
 )
+
+target_link_libraries(flutter-launcher-wayland
+  ${EGL_LIBRARIES}
+  ${WAYLAND_CLIENT_LIBRARIES}
+  ${WAYLAND_EGL_LIBRARIES}
+  ${FLUTTER_ENGINE_LIBRARIES}
+)
+
+install(TARGETS flutter-launcher-wayland DESTINATION bin)

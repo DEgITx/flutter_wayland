@@ -7,6 +7,7 @@
 #include <EGL/egl.h>
 #include <sys/types.h>
 
+#include <fstream>
 #include <chrono>
 #include <sstream>
 #include <vector>
@@ -17,24 +18,33 @@ namespace flutter {
 
 static_assert(FLUTTER_ENGINE_VERSION == 1, "");
 
-static const char* kICUDataFileName = "icudtl.dat";
-
 static std::string GetICUDataPath() {
-  auto exe_dir = GetExecutableDirectory();
-  if (exe_dir == "") {
-    return "";
-  }
-  std::stringstream stream;
-  stream << exe_dir << kICUDataFileName;
-
-  auto icu_path = stream.str();
-
-  if (!FileExistsAtPath(icu_path.c_str())) {
-    FLWAY_ERROR << "Could not find " << icu_path << std::endl;
-    return "";
+  auto base_directory = GetExecutableDirectory();
+  if (base_directory == "") {
+    base_directory = ".";
   }
 
-  return icu_path;
+  std::string data_directory = base_directory + "/data";
+  std::string icu_data_path  = data_directory + "/icudtl.dat";
+
+  do {
+    if (std::ifstream(icu_data_path)) {
+      std::cout << "Using: " << icu_data_path << std::endl;
+      break;
+    }
+
+    icu_data_path = "/usr/share/flutter/icudtl.dat";
+
+    if (std::ifstream(icu_data_path)) {
+      std::cout << "Using: " << icu_data_path << std::endl;
+      break;
+    }
+
+    FLWAY_ERROR << "Unnable to locate icudtl.dat file" << std::endl;
+    icu_data_path = "";
+  } while (0);
+
+  return icu_data_path;
 }
 
 FlutterApplication::FlutterApplication(
@@ -79,9 +89,6 @@ FlutterApplication::FlutterApplication(
   auto icu_data_path = GetICUDataPath();
 
   if (icu_data_path == "") {
-    FLWAY_ERROR << "Could not find ICU data. It should be placed next to the "
-                   "executable but it wasn't there."
-                << std::endl;
     return;
   }
 
