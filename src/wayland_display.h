@@ -7,6 +7,7 @@
 #include <EGL/egl.h>
 #include <wayland-client.h>
 #include <wayland-egl.h>
+#include <xkbcommon/xkbcommon.h>
 
 #include <memory>
 #include <string>
@@ -32,7 +33,10 @@ private:
   static const wl_seat_listener kSeatListener;
   static const wl_pointer_listener kPointerListener;
   static const wl_keyboard_listener kKeyboardListener;
-  bool valid_ = false;
+  struct xkb_state *xkb_state     = nullptr;
+  struct xkb_keymap *keymap       = nullptr;
+  struct xkb_context *xkb_context = nullptr;
+  bool valid_                     = false;
   const int screen_width_;
   const int screen_height_;
   wl_display *display_             = nullptr;

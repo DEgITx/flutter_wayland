@@ -6,15 +6,15 @@
 #define WL_EGL_PLATFORM 1
 #endif
 
-#include "wayland_display.h"
-
+#include <cstring>
 #include <cassert>
 #include <stdlib.h>
 #include <unistd.h>
 #include <poll.h>
 #include <errno.h>
+#include <sys/mman.h>
 
-#include <cstring>
+#include "wayland_display.h"
 
 namespace flutter {
 
@@ -90,37 +90,74 @@ const wl_pointer_listener WaylandDisplay::kPointerListener = {
 };
 
 const wl_keyboard_listener WaylandDisplay::kKeyboardListener = {
-    .keymap      = [](void *data, struct wl_keyboard *wl_keyboard, uint32_t format, int32_t fd, uint32_t size) {},
-    .enter       = [](void *data, struct wl_keyboard *wl_keyboard, uint32_t serial, struct wl_surface *surface, struct wl_array *keys) {},
-    .leave       = [](void *data, struct wl_keyboard *wl_keyboard, uint32_t serial, struct wl_surface *surface) {},
-    .key         = [](void *data, struct wl_keyboard *wl_keyboard, uint32_t serial, uint32_t time, uint32_t key, uint32_t state) {},
-    .modifiers   = [](void *data, struct wl_keyboard *wl_keyboard, uint32_t serial, uint32_t mods_depressed, uint32_t mods_latched, uint32_t mods_locked, uint32_t group) {},
+    .keymap =
+        [](void *data, struct wl_keyboard *wl_keyboard, uint32_t format, int32_t fd, uint32_t size) {
+          WaylandDisplay *wd = DISPLAY;
+          assert(wd);
+
+          char *keymap_string = reinterpret_cast<char *>(mmap(nullptr, size, PROT_READ, MAP_SHARED, fd, 0));
+          xkb_keymap_unref(wd->keymap);
+          wd->keymap = xkb_keymap_new_from_string(wd->xkb_context, keymap_string, XKB_KEYMAP_FORMAT_TEXT_V1, XKB_KEYMAP_COMPILE_NO_FLAGS);
+          munmap(keymap_string, size);
+          close(fd);
+          xkb_state_unref(wd->xkb_state);
+          wd->xkb_state = xkb_state_new(wd->keymap);
+        },
+    .enter = [](void *data, struct wl_keyboard *wl_keyboard, uint32_t serial, struct wl_surface *surface, struct wl_array *keys) {
+      printf("keyboard enter\n"); },
+    .leave = [](void *data, struct wl_keyboard *wl_keyboard, uint32_t serial, struct wl_surface *surface) {
+      printf("keyboard leave\n"); },
+    .key =
+        [](void *data, struct wl_keyboard *wl_keyboard, uint32_t serial, uint32_t time, uint32_t key, uint32_t state) {
+          if (state == WL_KEYBOARD_KEY_STATE_PRESSED) {
+            WaylandDisplay *wd = DISPLAY;
+            assert(wd);
+
+            xkb_keysym_t keysym = xkb_state_key_get_one_sym(wd->xkb_state, key + 8);
+            uint32_t utf32      = xkb_keysym_to_utf32(keysym);
+
+            if (utf32) {
+              if (utf32 >= 0x21 && utf32 <= 0x7E) {
+                printf("the key %c was pressed\n", (char)utf32);
+              } else {
+                printf("the key U+%04X was pressed\n", utf32);
+              }
+            } else {
+              char name[64];
+              xkb_keysym_get_name(keysym, name, sizeof(name));
+              printf("the key %s was pressed\n", name);
+            }
+          }
+        },
+    .modifiers =
+        [](void *data, struct wl_keyboard *wl_keyboard, uint32_t serial, uint32_t mods_depressed, uint32_t mods_latched, uint32_t mods_locked, uint32_t group) {
+          WaylandDisplay *wd = DISPLAY;
+          assert(wd);
+
+          xkb_state_update_mask(wd->xkb_state, mods_depressed, mods_latched, mods_locked, 0, 0, group);
+        },
     .repeat_info = [](void *data, struct wl_keyboard *wl_keyboard, int32_t rate, int32_t delay) {},
 };
 
 const wl_seat_listener WaylandDisplay::kSeatListener = {
     .capabilities =
         [](void *data, struct wl_seat *seat, uint32_t capabilities) {
+          printf("capabilities(data:%p, seat:%p, capabilities:0x%x)\n", data, seat, capabilities);
+
           WaylandDisplay *wd = DISPLAY;
-
-          if (wd == nullptr)
-            return;
-
-          if (wd->window_ == nullptr)
-            return;
-
+          assert(wd);
           assert(seat == wd->seat_);
 
           if (capabilities & WL_SEAT_CAPABILITY_POINTER) {
             printf("seat_capabilities - pointer\n");
             struct wl_pointer *pointer = wl_seat_get_pointer(seat);
-            wl_pointer_add_listener(pointer, &kPointerListener, NULL);
+            wl_pointer_add_listener(pointer, &kPointerListener, wd);
           }
 
           if (capabilities & WL_SEAT_CAPABILITY_KEYBOARD) {
             printf("seat_capabilities - keyboard\n");
             struct wl_keyboard *keyboard = wl_seat_get_keyboard(seat);
-            wl_keyboard_add_listener(keyboard, &kKeyboardListener, NULL);
+            wl_keyboard_add_listener(keyboard, &kKeyboardListener, wd);
           }
 
           if (capabilities & WL_SEAT_CAPABILITY_TOUCH) {
@@ -135,7 +172,8 @@ const wl_seat_listener WaylandDisplay::kSeatListener = {
 };
 
 WaylandDisplay::WaylandDisplay(size_t width, size_t height)
-    : screen_width_(width)
+    : xkb_context(xkb_context_new(XKB_CONTEXT_NO_FLAGS))
+    , screen_width_(width)
     , screen_height_(height) {
   if (screen_width_ == 0 || screen_height_ == 0) {
     FLWAY_ERROR << "Invalid screen dimensions." << std::endl;
@@ -402,26 +440,25 @@ bool WaylandDisplay::SetupEGL() {
     }
   }
 
-  if (seat_) {
-    wl_seat_add_listener(seat_, &kSeatListener, this);
-  }
-
   return true;
 }
 
-void WaylandDisplay::AnnounceRegistryInterface(struct wl_registry *wl_registry, uint32_t name, const char *interface_name, uint32_t version) {
-  if (strcmp(interface_name, "wl_compositor") == 0) {
-    compositor_ = static_cast<decltype(compositor_)>(wl_registry_bind(wl_registry, name, &wl_compositor_interface, 1));
+void WaylandDisplay::AnnounceRegistryInterface(struct wl_registry *registry, uint32_t name, const char *interface, uint32_t version) {
+  printf("AnnounceRegistryInterface(registry:%p, name:%2u, interface:%s, version:%u)\n", registry, name, interface, version);
+
+  if (strcmp(interface, "wl_compositor") == 0) {
+    compositor_ = static_cast<decltype(compositor_)>(wl_registry_bind(registry, name, &wl_compositor_interface, 1));
     return;
   }
 
-  if (strcmp(interface_name, "wl_shell") == 0) {
-    shell_ = static_cast<decltype(shell_)>(wl_registry_bind(wl_registry, name, &wl_shell_interface, 1));
+  if (strcmp(interface, "wl_shell") == 0) {
+    shell_ = static_cast<decltype(shell_)>(wl_registry_bind(registry, name, &wl_shell_interface, 1));
     return;
   }
 
-  if (strcmp(interface_name, "wl_seat") == 0) {
-    seat_ = static_cast<decltype(seat_)>(wl_registry_bind(wl_registry, name, &wl_seat_interface, 1));
+  if (strcmp(interface, "wl_seat") == 0) {
+    seat_ = static_cast<decltype(seat_)>(wl_registry_bind(registry, name, &wl_seat_interface, 1));
+    wl_seat_add_listener(seat_, &kSeatListener, this);
     return;
   }
 }

@@ -7,6 +7,7 @@ cmake_minimum_required(VERSION 3.3)
 project(flutter-launcher-wayland)
 
 find_package(PkgConfig)
+pkg_search_module(XKB xkbcommon REQUIRED)
 pkg_search_module(EGL egl REQUIRED)
 pkg_search_module(WAYLAND_CLIENT wayland-client REQUIRED)
 pkg_search_module(WAYLAND_EGL wayland-egl REQUIRED)
@@ -33,6 +34,7 @@ set(SOURCES
 )
 
 link_directories(
+    ${XKB_LIBRARY_DIRS}
     ${EGL_LIBRARY_DIRS}
     ${WAYLAND_CLIENT_LIBRARY_DIRS}
     ${WAYLAND_EGL_LIBRARY_DIRS}
@@ -43,6 +45,7 @@ add_executable(flutter-launcher-wayland ${SOURCES})
 
 target_include_directories(flutter-launcher-wayland
   PRIVATE
+  ${XKB_INCLUDE_DIRS}
   ${EGL_INCLUDE_DIRS}
   ${WAYLAND_CLIENT_INCLUDE_DIRS}
   ${WAYLAND_EGL_INCLUDE_DIRS}
@@ -50,6 +53,7 @@ target_include_directories(flutter-launcher-wayland
 )
 
 target_link_libraries(flutter-launcher-wayland
+  ${XKB_LIBRARIES}
   ${EGL_LIBRARIES}
   ${WAYLAND_CLIENT_LIBRARIES}
   ${WAYLAND_EGL_LIBRARIES}
