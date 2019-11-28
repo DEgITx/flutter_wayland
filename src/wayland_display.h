@@ -31,6 +31,7 @@ private:
   static const wl_shell_surface_listener kShellSurfaceListener;
   static const wl_seat_listener kSeatListener;
   static const wl_pointer_listener kPointerListener;
+  static const wl_keyboard_listener kKeyboardListener;
   bool valid_ = false;
   const int screen_width_;
   const int screen_height_;

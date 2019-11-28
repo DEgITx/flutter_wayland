@@ -8,6 +8,7 @@
 
 #include "wayland_display.h"
 
+#include <cassert>
 #include <stdlib.h>
 #include <unistd.h>
 #include <poll.h>
@@ -88,6 +89,15 @@ const wl_pointer_listener WaylandDisplay::kPointerListener = {
 
 };
 
+const wl_keyboard_listener WaylandDisplay::kKeyboardListener = {
+    .keymap      = [](void *data, struct wl_keyboard *wl_keyboard, uint32_t format, int32_t fd, uint32_t size) {},
+    .enter       = [](void *data, struct wl_keyboard *wl_keyboard, uint32_t serial, struct wl_surface *surface, struct wl_array *keys) {},
+    .leave       = [](void *data, struct wl_keyboard *wl_keyboard, uint32_t serial, struct wl_surface *surface) {},
+    .key         = [](void *data, struct wl_keyboard *wl_keyboard, uint32_t serial, uint32_t time, uint32_t key, uint32_t state) {},
+    .modifiers   = [](void *data, struct wl_keyboard *wl_keyboard, uint32_t serial, uint32_t mods_depressed, uint32_t mods_latched, uint32_t mods_locked, uint32_t group) {},
+    .repeat_info = [](void *data, struct wl_keyboard *wl_keyboard, int32_t rate, int32_t delay) {},
+};
+
 const wl_seat_listener WaylandDisplay::kSeatListener = {
     .capabilities =
         [](void *data, struct wl_seat *seat, uint32_t capabilities) {
@@ -99,6 +109,8 @@ const wl_seat_listener WaylandDisplay::kSeatListener = {
           if (wd->window_ == nullptr)
             return;
 
+          assert(seat == wd->seat_);
+
           if (capabilities & WL_SEAT_CAPABILITY_POINTER) {
             printf("seat_capabilities - pointer\n");
             struct wl_pointer *pointer = wl_seat_get_pointer(seat);
@@ -107,8 +119,8 @@ const wl_seat_listener WaylandDisplay::kSeatListener = {
 
           if (capabilities & WL_SEAT_CAPABILITY_KEYBOARD) {
             printf("seat_capabilities - keyboard\n");
-            // struct wl_keyboard *keyboard = wl_seat_get_keyboard (seat);
-            // wl_keyboard_add_listener (keyboard, &keyboard_listener, NULL);
+            struct wl_keyboard *keyboard = wl_seat_get_keyboard(seat);
+            wl_keyboard_add_listener(keyboard, &kKeyboardListener, NULL);
           }
 
           if (capabilities & WL_SEAT_CAPABILITY_TOUCH) {
