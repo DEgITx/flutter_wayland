@@ -65,6 +65,29 @@ const wl_shell_surface_listener WaylandDisplay::kShellSurfaceListener = {
     },
 };
 
+const wl_seat_listener WaylandDisplay::kSeatListener = {
+  .capabilities = [](void *data, struct wl_seat *seat, uint32_t capabilities) {
+    WaylandDisplay *wd = DISPLAY;
+
+    if (wd == nullptr)
+      return;
+
+    if (wd->window_ == nullptr)
+      return;
+
+    if (capabilities & WL_SEAT_CAPABILITY_POINTER) {
+    }
+    if (capabilities & WL_SEAT_CAPABILITY_KEYBOARD) {
+    }
+    if (capabilities & WL_SEAT_CAPABILITY_TOUCH) {
+    }
+  },
+
+  .name = [](void *data, struct wl_seat *wl_seat, const char *name) {
+    // Nothing to do.
+  },
+};
+
 WaylandDisplay::WaylandDisplay(size_t width, size_t height)
     : screen_width_(width), screen_height_(height) {
   if (screen_width_ == 0 || screen_height_ == 0) {
@@ -106,6 +129,11 @@ WaylandDisplay::~WaylandDisplay() {
   if (shell_) {
     wl_shell_destroy(shell_);
     shell_ = nullptr;
+  }
+
+  if (seat_) {
+    wl_seat_destroy(seat_);
+    seat_ = nullptr;
   }
 
   if (egl_surface_) {
@@ -350,6 +378,9 @@ bool WaylandDisplay::SetupEGL() {
     }
   }
 
+  if (seat_) {
+    wl_seat_add_listener(seat_, &kSeatListener, this);
+  }
 
   return true;
 }
@@ -367,6 +398,12 @@ void WaylandDisplay::AnnounceRegistryInterface(struct wl_registry* wl_registry,
   if (strcmp(interface_name, "wl_shell") == 0) {
     shell_ = static_cast<decltype(shell_)>(
         wl_registry_bind(wl_registry, name, &wl_shell_interface, 1));
+    return;
+  }
+
+  if (strcmp(interface_name, "wl_seat") == 0) {
+    seat_ = static_cast<decltype(seat_)>(
+        wl_registry_bind(wl_registry, name, &wl_seat_interface, 1));
     return;
   }
 }

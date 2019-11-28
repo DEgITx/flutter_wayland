@@ -29,6 +29,7 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate {
  private:
   static const wl_registry_listener kRegistryListener;
   static const wl_shell_surface_listener kShellSurfaceListener;
+  static const wl_seat_listener kSeatListener;
   bool valid_ = false;
   const int screen_width_;
   const int screen_height_;
@@ -36,6 +37,7 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate {
   wl_registry* registry_ = nullptr;
   wl_compositor* compositor_ = nullptr;
   wl_shell* shell_ = nullptr;
+  wl_seat* seat_ = nullptr;
   wl_shell_surface* shell_surface_ = nullptr;
   wl_surface* surface_ = nullptr;
   wl_egl_window* window_ = nullptr;
