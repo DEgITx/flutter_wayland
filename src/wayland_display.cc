@@ -10,6 +10,8 @@
 
 #include <stdlib.h>
 #include <unistd.h>
+#include <poll.h>
+#include <errno.h>
 
 #include <cstring>
 
@@ -153,8 +155,33 @@ bool WaylandDisplay::Run() {
     return false;
   }
 
+  const int fd = wl_display_get_fd(display_);
+
   while (valid_) {
-    wl_display_dispatch(display_);
+    while (wl_display_prepare_read(display_) < 0) {
+      wl_display_dispatch_pending(display_);
+    }
+
+    wl_display_flush(display_);
+
+    int rv;
+
+    do {
+      struct pollfd fds = {
+        .fd = fd,
+        .events = POLLIN
+      };
+
+      rv = poll(&fds, 1, 1);
+    } while(rv == -1 && rv == EINTR);
+
+    if (rv <= 0) {
+      wl_display_cancel_read(display_);
+    } else {
+      wl_display_read_events(display_);
+    }
+
+    wl_display_dispatch_pending(display_);
   }
 
   return true;
