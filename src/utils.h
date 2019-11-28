@@ -12,8 +12,8 @@ std::string GetExecutableName();
 
 std::string GetExecutableDirectory();
 
-bool FileExistsAtPath(const std::string& path);
+bool FileExistsAtPath(const std::string &path);
 
-bool FlutterAssetBundleIsValid(const std::string& bundle_path);
+bool FlutterAssetBundleIsValid(const std::string &bundle_path);
 
-}  // namespace flutter
+} // namespace flutter

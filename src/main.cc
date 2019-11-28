@@ -16,9 +16,7 @@ namespace flutter {
 static void PrintUsage() {
   std::cerr << "Flutter Wayland Embedder" << std::endl << std::endl;
   std::cerr << "========================" << std::endl;
-  std::cerr << "Usage: `" << GetExecutableName()
-            << " <asset_bundle_path> <flutter_flags>`" << std::endl
-            << std::endl;
+  std::cerr << "Usage: `" << GetExecutableName() << " <asset_bundle_path> <flutter_flags>`" << std::endl << std::endl;
   std::cerr << R"~(
 This utility runs an instance of a Flutter application and renders using
 Wayland core protocols.
@@ -55,10 +53,10 @@ static bool Main(std::vector<std::string> args) {
     return false;
   }
 
-  const size_t kWidth = 800;
+  const size_t kWidth  = 800;
   const size_t kHeight = 600;
 
-  for (const auto& arg : args) {
+  for (const auto &arg : args) {
     FLWAY_LOG << "Arg: " << arg << std::endl;
   }
 
@@ -85,9 +83,9 @@ static bool Main(std::vector<std::string> args) {
   return true;
 }
 
-}  // namespace flutter
+} // namespace flutter
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
   std::vector<std::string> args;
   for (int i = 0; i < argc; ++i) {
     args.push_back(argv[i]);

@@ -17,7 +17,7 @@
 namespace flutter {
 
 class WaylandDisplay : public FlutterApplication::RenderDelegate {
- public:
+public:
   WaylandDisplay(size_t width, size_t height);
 
   ~WaylandDisplay();
@@ -26,34 +26,31 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate {
 
   bool Run();
 
- private:
+private:
   static const wl_registry_listener kRegistryListener;
   static const wl_shell_surface_listener kShellSurfaceListener;
   static const wl_seat_listener kSeatListener;
+  static const wl_pointer_listener kPointerListener;
   bool valid_ = false;
   const int screen_width_;
   const int screen_height_;
-  wl_display* display_ = nullptr;
-  wl_registry* registry_ = nullptr;
-  wl_compositor* compositor_ = nullptr;
-  wl_shell* shell_ = nullptr;
-  wl_seat* seat_ = nullptr;
-  wl_shell_surface* shell_surface_ = nullptr;
-  wl_surface* surface_ = nullptr;
-  wl_egl_window* window_ = nullptr;
-  EGLDisplay egl_display_ = EGL_NO_DISPLAY;
-  EGLSurface egl_surface_ = nullptr;
-  EGLContext egl_context_ = EGL_NO_CONTEXT;
+  wl_display *display_             = nullptr;
+  wl_registry *registry_           = nullptr;
+  wl_compositor *compositor_       = nullptr;
+  wl_shell *shell_                 = nullptr;
+  wl_seat *seat_                   = nullptr;
+  wl_shell_surface *shell_surface_ = nullptr;
+  wl_surface *surface_             = nullptr;
+  wl_egl_window *window_           = nullptr;
+  EGLDisplay egl_display_          = EGL_NO_DISPLAY;
+  EGLSurface egl_surface_          = nullptr;
+  EGLContext egl_context_          = EGL_NO_CONTEXT;
 
   bool SetupEGL();
 
-  void AnnounceRegistryInterface(struct wl_registry* wl_registry,
-                                 uint32_t name,
-                                 const char* interface,
-                                 uint32_t version);
+  void AnnounceRegistryInterface(struct wl_registry *wl_registry, uint32_t name, const char *interface, uint32_t version);
 
-  void UnannounceRegistryInterface(struct wl_registry* wl_registry,
-                                   uint32_t name);
+  void UnannounceRegistryInterface(struct wl_registry *wl_registry, uint32_t name);
 
   bool StopRunning();
 
@@ -72,4 +69,4 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate {
   FLWAY_DISALLOW_COPY_AND_ASSIGN(WaylandDisplay);
 };
 
-}  // namespace flutter
+} // namespace flutter

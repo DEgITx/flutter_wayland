@@ -14,9 +14,9 @@
 namespace flutter {
 
 class FlutterApplication {
- public:
+public:
   class RenderDelegate {
-   public:
+  public:
     virtual bool OnApplicationContextMakeCurrent() = 0;
 
     virtual bool OnApplicationContextClearCurrent() = 0;
@@ -26,9 +26,7 @@ class FlutterApplication {
     virtual uint32_t OnApplicationGetOnscreenFBO() = 0;
   };
 
-  FlutterApplication(std::string bundle_path,
-                     const std::vector<std::string>& args,
-                     RenderDelegate& render_delegate);
+  FlutterApplication(std::string bundle_path, const std::vector<std::string> &args, RenderDelegate &render_delegate);
 
   ~FlutterApplication();
 
@@ -40,15 +38,15 @@ class FlutterApplication {
 
   bool SendPointerEvent(int button, int x, int y);
 
- private:
+private:
   bool valid_;
-  RenderDelegate& render_delegate_;
+  RenderDelegate &render_delegate_;
   FlutterEngine engine_ = nullptr;
-  int last_button_ = 0;
+  int last_button_      = 0;
 
   bool SendFlutterPointerEvent(FlutterPointerPhase phase, double x, double y);
 
   FLWAY_DISALLOW_COPY_AND_ASSIGN(FlutterApplication);
 };
 
-}  // namespace flutter
+} // namespace flutter

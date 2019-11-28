@@ -47,40 +47,24 @@ static std::string GetICUDataPath() {
   return icu_data_path;
 }
 
-FlutterApplication::FlutterApplication(
-    std::string bundle_path,
-    const std::vector<std::string>& command_line_args,
-    RenderDelegate& render_delegate)
+FlutterApplication::FlutterApplication(std::string bundle_path, const std::vector<std::string> &command_line_args, RenderDelegate &render_delegate)
     : render_delegate_(render_delegate) {
   if (!FlutterAssetBundleIsValid(bundle_path)) {
     FLWAY_ERROR << "Flutter asset bundle was not valid." << std::endl;
     return;
   }
 
-  FlutterRendererConfig config = {};
-  config.type = kOpenGL;
-  config.open_gl.struct_size = sizeof(config.open_gl);
-  config.open_gl.make_current = [](void* userdata) -> bool {
-    return reinterpret_cast<FlutterApplication*>(userdata)
-        ->render_delegate_.OnApplicationContextMakeCurrent();
-  };
-  config.open_gl.clear_current = [](void* userdata) -> bool {
-    return reinterpret_cast<FlutterApplication*>(userdata)
-        ->render_delegate_.OnApplicationContextClearCurrent();
-  };
-  config.open_gl.present = [](void* userdata) -> bool {
-    return reinterpret_cast<FlutterApplication*>(userdata)
-        ->render_delegate_.OnApplicationPresent();
-  };
-  config.open_gl.fbo_callback = [](void* userdata) -> uint32_t {
-    return reinterpret_cast<FlutterApplication*>(userdata)
-        ->render_delegate_.OnApplicationGetOnscreenFBO();
-  };
-  config.open_gl.gl_proc_resolver = [](void* userdata,
-                                       const char* name) -> void* {
+  FlutterRendererConfig config    = {};
+  config.type                     = kOpenGL;
+  config.open_gl.struct_size      = sizeof(config.open_gl);
+  config.open_gl.make_current     = [](void *userdata) -> bool { return reinterpret_cast<FlutterApplication *>(userdata)->render_delegate_.OnApplicationContextMakeCurrent(); };
+  config.open_gl.clear_current    = [](void *userdata) -> bool { return reinterpret_cast<FlutterApplication *>(userdata)->render_delegate_.OnApplicationContextClearCurrent(); };
+  config.open_gl.present          = [](void *userdata) -> bool { return reinterpret_cast<FlutterApplication *>(userdata)->render_delegate_.OnApplicationPresent(); };
+  config.open_gl.fbo_callback     = [](void *userdata) -> uint32_t { return reinterpret_cast<FlutterApplication *>(userdata)->render_delegate_.OnApplicationGetOnscreenFBO(); };
+  config.open_gl.gl_proc_resolver = [](void *userdata, const char *name) -> void * {
     auto address = eglGetProcAddress(name);
     if (address != nullptr) {
-      return reinterpret_cast<void*>(address);
+      return reinterpret_cast<void *>(address);
     }
     FLWAY_ERROR << "Tried unsuccessfully to resolve: " << name << std::endl;
     return nullptr;
@@ -92,23 +76,22 @@ FlutterApplication::FlutterApplication(
     return;
   }
 
-  std::vector<const char*> command_line_args_c;
+  std::vector<const char *> command_line_args_c;
 
-  for (const auto& arg : command_line_args) {
+  for (const auto &arg : command_line_args) {
     command_line_args_c.push_back(arg.c_str());
   }
 
   FlutterProjectArgs args = {
-      .struct_size = sizeof(FlutterProjectArgs),
-      .assets_path = bundle_path.c_str(),
-      .icu_data_path = icu_data_path.c_str(),
+      .struct_size       = sizeof(FlutterProjectArgs),
+      .assets_path       = bundle_path.c_str(),
+      .icu_data_path     = icu_data_path.c_str(),
       .command_line_argc = static_cast<int>(command_line_args_c.size()),
       .command_line_argv = command_line_args_c.data(),
   };
 
   FlutterEngine engine = nullptr;
-  auto result = FlutterEngineRun(FLUTTER_ENGINE_VERSION, &config, &args,
-                                 this /* userdata */, &engine_);
+  auto result          = FlutterEngineRun(FLUTTER_ENGINE_VERSION, &config, &args, this /* userdata */, &engine_);
 
   if (result != kSuccess) {
     FLWAY_ERROR << "Could not run the Flutter engine" << std::endl;
@@ -136,10 +119,10 @@ bool FlutterApplication::IsValid() const {
 
 bool FlutterApplication::SetWindowSize(size_t width, size_t height) {
   FlutterWindowMetricsEvent event = {};
-  event.struct_size = sizeof(event);
-  event.width = width;
-  event.height = height;
-  event.pixel_ratio = 1.0;
+  event.struct_size               = sizeof(event);
+  event.width                     = width;
+  event.height                    = height;
+  event.pixel_ratio               = 1.0;
   return FlutterEngineSendWindowMetricsEvent(engine_, &event) == kSuccess;
 }
 
@@ -172,19 +155,14 @@ bool FlutterApplication::SendPointerEvent(int button, int x, int y) {
   return SendFlutterPointerEvent(phase, x, y);
 }
 
-bool FlutterApplication::SendFlutterPointerEvent(FlutterPointerPhase phase,
-                                                 double x,
-                                                 double y) {
+bool FlutterApplication::SendFlutterPointerEvent(FlutterPointerPhase phase, double x, double y) {
   FlutterPointerEvent event = {};
-  event.struct_size = sizeof(event);
-  event.phase = phase;
-  event.x = x;
-  event.y = y;
-  event.timestamp =
-      std::chrono::duration_cast<std::chrono::microseconds>(
-          std::chrono::high_resolution_clock::now().time_since_epoch())
-          .count();
+  event.struct_size         = sizeof(event);
+  event.phase               = phase;
+  event.x                   = x;
+  event.y                   = y;
+  event.timestamp           = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
   return FlutterEngineSendPointerEvent(engine_, &event, 1) == kSuccess;
 }
 
-}  // namespace flutter
+} // namespace flutter
