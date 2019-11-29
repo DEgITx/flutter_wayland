@@ -24,7 +24,6 @@ else()
 endif()
 
 set(SOURCES
-    src/flutter_application.cc
     src/main.cc
     src/utils.cc
     src/wayland_display.cc

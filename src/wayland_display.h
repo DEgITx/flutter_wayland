@@ -8,18 +8,19 @@
 #include <wayland-client.h>
 #include <wayland-egl.h>
 #include <xkbcommon/xkbcommon.h>
+#include <flutter_embedder.h>
 
 #include <memory>
 #include <string>
+#include <sys/types.h>
 
-#include "flutter_application.h"
 #include "macros.h"
 
 namespace flutter {
 
-class WaylandDisplay : public FlutterApplication::RenderDelegate {
+class WaylandDisplay {
 public:
-  WaylandDisplay(size_t width, size_t height);
+  WaylandDisplay(size_t width, size_t height, const std::string &bundle_path, const std::vector<std::string> &args);
 
   ~WaylandDisplay();
 
@@ -58,7 +59,11 @@ private:
   EGLSurface egl_surface_          = nullptr;
   EGLContext egl_context_          = EGL_NO_CONTEXT;
 
+  FlutterEngine engine_ = nullptr;
+
   bool SetupEGL();
+
+  bool SetupEngine(const std::string &bundle_path, const std::vector<std::string> &command_line_args);
 
   void AnnounceRegistryInterface(struct wl_registry *wl_registry, uint32_t name, const char *interface, uint32_t version);
 
@@ -66,17 +71,13 @@ private:
 
   bool StopRunning();
 
-  // |flutter::FlutterApplication::RenderDelegate|
-  bool OnApplicationContextMakeCurrent() override;
+  bool OnApplicationContextMakeCurrent();
 
-  // |flutter::FlutterApplication::RenderDelegate|
-  bool OnApplicationContextClearCurrent() override;
+  bool OnApplicationContextClearCurrent();
 
-  // |flutter::FlutterApplication::RenderDelegate|
-  bool OnApplicationPresent() override;
+  bool OnApplicationPresent();
 
-  // |flutter::FlutterApplication::RenderDelegate|
-  uint32_t OnApplicationGetOnscreenFBO() override;
+  uint32_t OnApplicationGetOnscreenFBO();
 
   FLWAY_DISALLOW_COPY_AND_ASSIGN(WaylandDisplay);
 };

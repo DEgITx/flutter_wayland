@@ -7,9 +7,11 @@
 #include <string>
 #include <vector>
 
-#include "flutter_application.h"
+
 #include "utils.h"
 #include "wayland_display.h"
+
+static_assert(FLUTTER_ENGINE_VERSION == 1, "");
 
 namespace flutter {
 
@@ -60,23 +62,17 @@ static bool Main(std::vector<std::string> args) {
     FLWAY_LOG << "Arg: " << arg << std::endl;
   }
 
-  WaylandDisplay display(kWidth, kHeight);
+  WaylandDisplay display(kWidth, kHeight, asset_bundle_path, args);
 
   if (!display.IsValid()) {
     FLWAY_ERROR << "Wayland display was not valid." << std::endl;
     return false;
   }
 
-  FlutterApplication application(asset_bundle_path, args, display);
-  if (!application.IsValid()) {
-    FLWAY_ERROR << "Flutter application was not valid." << std::endl;
-    return false;
-  }
-
-  if (!application.SetWindowSize(kWidth, kHeight)) {
-    FLWAY_ERROR << "Could not update Flutter application size." << std::endl;
-    return false;
-  }
+  // if (!application.SetWindowSize(kWidth, kHeight)) {
+  //   FLWAY_ERROR << "Could not update Flutter application size." << std::endl;
+  //   return false;
+  // }
 
   display.Run();
 

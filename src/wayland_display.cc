@@ -6,6 +6,12 @@
 #define WL_EGL_PLATFORM 1
 #endif
 
+#include <fstream>
+#include <chrono>
+#include <sstream>
+#include <vector>
+#include <functional>
+
 #include <cstring>
 #include <cassert>
 #include <stdlib.h>
@@ -14,9 +20,39 @@
 #include <errno.h>
 #include <sys/mman.h>
 
+#include "utils.h"
 #include "wayland_display.h"
 
 namespace flutter {
+
+static std::string GetICUDataPath() {
+  auto base_directory = GetExecutableDirectory();
+  if (base_directory == "") {
+    base_directory = ".";
+  }
+
+  std::string data_directory = base_directory + "/data";
+  std::string icu_data_path  = data_directory + "/icudtl.dat";
+
+  do {
+    if (std::ifstream(icu_data_path)) {
+      std::cout << "Using: " << icu_data_path << std::endl;
+      break;
+    }
+
+    icu_data_path = "/usr/share/flutter/icudtl.dat";
+
+    if (std::ifstream(icu_data_path)) {
+      std::cout << "Using: " << icu_data_path << std::endl;
+      break;
+    }
+
+    FLWAY_ERROR << "Unnable to locate icudtl.dat file" << std::endl;
+    icu_data_path = "";
+  } while (0);
+
+  return icu_data_path;
+}
 
 #define DISPLAY reinterpret_cast<WaylandDisplay *>(data)
 
@@ -189,7 +225,7 @@ const wl_seat_listener WaylandDisplay::kSeatListener = {
         },
 };
 
-WaylandDisplay::WaylandDisplay(size_t width, size_t height)
+WaylandDisplay::WaylandDisplay(size_t width, size_t height, const std::string &bundle_path, const std::vector<std::string> &command_line_args)
     : xkb_context(xkb_context_new(XKB_CONTEXT_NO_FLAGS))
     , screen_width_(width)
     , screen_height_(height) {
@@ -220,10 +256,76 @@ WaylandDisplay::WaylandDisplay(size_t width, size_t height)
     return;
   }
 
+  if (!SetupEngine(bundle_path, command_line_args)) {
+    FLWAY_ERROR << "Could not setup Flutter Engine." << std::endl;
+    return;
+  }
+
   valid_ = true;
 }
 
+bool WaylandDisplay::SetupEngine(const std::string &bundle_path, const std::vector<std::string> &command_line_args) {
+  FlutterRendererConfig config    = {};
+  config.type                     = kOpenGL;
+  config.open_gl.struct_size      = sizeof(config.open_gl);
+  config.open_gl.make_current     = [](void *userdata) -> bool { return reinterpret_cast<WaylandDisplay *>(userdata)->OnApplicationContextMakeCurrent(); };
+  config.open_gl.clear_current    = [](void *userdata) -> bool { return reinterpret_cast<WaylandDisplay *>(userdata)->OnApplicationContextClearCurrent(); };
+  config.open_gl.present          = [](void *userdata) -> bool { return reinterpret_cast<WaylandDisplay *>(userdata)->OnApplicationPresent(); };
+  config.open_gl.fbo_callback     = [](void *userdata) -> uint32_t { return reinterpret_cast<WaylandDisplay *>(userdata)->OnApplicationGetOnscreenFBO(); };
+  config.open_gl.gl_proc_resolver = [](void *userdata, const char *name) -> void * {
+    auto address = eglGetProcAddress(name);
+    if (address != nullptr) {
+      return reinterpret_cast<void *>(address);
+    }
+    FLWAY_ERROR << "Tried unsuccessfully to resolve: " << name << std::endl;
+    return nullptr;
+  };
+
+  auto icu_data_path = GetICUDataPath();
+
+  if (icu_data_path == "") {
+    return false;
+  }
+
+  std::vector<const char *> command_line_args_c;
+
+  for (const auto &arg : command_line_args) {
+    command_line_args_c.push_back(arg.c_str());
+  }
+
+  FlutterProjectArgs args = {
+      .struct_size       = sizeof(FlutterProjectArgs),
+      .assets_path       = bundle_path.c_str(),
+      .icu_data_path     = icu_data_path.c_str(),
+      .command_line_argc = static_cast<int>(command_line_args_c.size()),
+      .command_line_argv = command_line_args_c.data(),
+  };
+
+  auto result = FlutterEngineRun(FLUTTER_ENGINE_VERSION, &config, &args, this /* userdata */, &engine_);
+
+  if (result != kSuccess) {
+    FLWAY_ERROR << "Could not run the Flutter engine" << std::endl;
+    return false;
+  }
+
+  FlutterWindowMetricsEvent event = {};
+  event.struct_size               = sizeof(event);
+  event.width                     = screen_width_;
+  event.height                    = screen_height_;
+  event.pixel_ratio               = 1.0;
+
+  return FlutterEngineSendWindowMetricsEvent(engine_, &event) == kSuccess;
+}
+
 WaylandDisplay::~WaylandDisplay() {
+
+  if (engine_ == nullptr) {
+    auto result = FlutterEngineShutdown(engine_);
+    if (result != kSuccess) {
+      FLWAY_ERROR << "Could not shutdown the Flutter engine." << std::endl;
+    }
+  }
+
   if (shell_surface_) {
     wl_shell_surface_destroy(shell_surface_);
     shell_surface_ = nullptr;
@@ -484,13 +586,7 @@ void WaylandDisplay::AnnounceRegistryInterface(struct wl_registry *registry, uin
 void WaylandDisplay::UnannounceRegistryInterface(struct wl_registry *wl_registry, uint32_t name) {
 }
 
-// |flutter::FlutterApplication::RenderDelegate|
 bool WaylandDisplay::OnApplicationContextMakeCurrent() {
-  if (!valid_) {
-    FLWAY_ERROR << "Invalid display." << std::endl;
-    return false;
-  }
-
   if (eglMakeCurrent(egl_display_, egl_surface_, egl_surface_, egl_context_) != EGL_TRUE) {
     LogLastEGLError();
     FLWAY_ERROR << "Could not make the onscreen context current" << std::endl;
@@ -500,13 +596,7 @@ bool WaylandDisplay::OnApplicationContextMakeCurrent() {
   return true;
 }
 
-// |flutter::FlutterApplication::RenderDelegate|
 bool WaylandDisplay::OnApplicationContextClearCurrent() {
-  if (!valid_) {
-    FLWAY_ERROR << "Invalid display." << std::endl;
-    return false;
-  }
-
   if (eglMakeCurrent(egl_display_, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT) != EGL_TRUE) {
     LogLastEGLError();
     FLWAY_ERROR << "Could not clear the context." << std::endl;
@@ -516,13 +606,7 @@ bool WaylandDisplay::OnApplicationContextClearCurrent() {
   return true;
 }
 
-// |flutter::FlutterApplication::RenderDelegate|
 bool WaylandDisplay::OnApplicationPresent() {
-  if (!valid_) {
-    FLWAY_ERROR << "Invalid display." << std::endl;
-    return false;
-  }
-
   if (eglSwapBuffers(egl_display_, egl_surface_) != EGL_TRUE) {
     LogLastEGLError();
     FLWAY_ERROR << "Could not swap the EGL buffer." << std::endl;
@@ -532,12 +616,7 @@ bool WaylandDisplay::OnApplicationPresent() {
   return true;
 }
 
-// |flutter::FlutterApplication::RenderDelegate|
 uint32_t WaylandDisplay::OnApplicationGetOnscreenFBO() {
-  if (!valid_) {
-    FLWAY_ERROR << "Invalid display." << std::endl;
-    return 999;
-  }
 
   return 0; // FBO0
 }
