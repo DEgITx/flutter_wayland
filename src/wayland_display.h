@@ -30,13 +30,20 @@ public:
 private:
   static const wl_registry_listener kRegistryListener;
   static const wl_shell_surface_listener kShellSurfaceListener;
+
   static const wl_seat_listener kSeatListener;
+
   static const wl_pointer_listener kPointerListener;
+  double surface_x = 0;
+  double surface_y = 0;
+
   static const wl_keyboard_listener kKeyboardListener;
-  struct xkb_state *xkb_state     = nullptr;
-  struct xkb_keymap *keymap       = nullptr;
-  struct xkb_context *xkb_context = nullptr;
-  bool valid_                     = false;
+  wl_keyboard_keymap_format keymap_format = WL_KEYBOARD_KEYMAP_FORMAT_NO_KEYMAP;
+  struct xkb_state *xkb_state             = nullptr;
+  struct xkb_keymap *keymap               = nullptr;
+  struct xkb_context *xkb_context         = nullptr;
+
+  bool valid_ = false;
   const int screen_width_;
   const int screen_height_;
   wl_display *display_             = nullptr;

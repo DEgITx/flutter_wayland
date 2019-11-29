@@ -49,43 +49,52 @@ const wl_shell_surface_listener WaylandDisplay::kShellSurfaceListener = {
 };
 
 const wl_pointer_listener WaylandDisplay::kPointerListener = {
-    .enter =
-        [](void *data, struct wl_pointer *wl_pointer, uint32_t serial, struct wl_surface *surface, wl_fixed_t surface_x, wl_fixed_t surface_y) {
+    .enter = [](void *data, struct wl_pointer *wl_pointer, uint32_t serial, struct wl_surface *surface, wl_fixed_t surface_x, wl_fixed_t surface_y) {},
 
-        },
-    .leave =
-        [](void *data, struct wl_pointer *wl_pointer, uint32_t serial, struct wl_surface *surface) {
+    .leave = [](void *data, struct wl_pointer *wl_pointer, uint32_t serial, struct wl_surface *surface) {},
 
-        },
     .motion =
         [](void *data, struct wl_pointer *wl_pointer, uint32_t time, wl_fixed_t surface_x, wl_fixed_t surface_y) {
+          WaylandDisplay *wd = DISPLAY;
+          assert(wd);
 
+          wd->surface_x = surface_x;
+          wd->surface_y = surface_y;
         },
+
     .button =
         [](void *data, struct wl_pointer *wl_pointer, uint32_t serial, uint32_t time, uint32_t button, uint32_t state) {
+          WaylandDisplay *wd = DISPLAY;
+          assert(wd);
 
+          uint32_t button_number = button - 1;
+          button_number          = button_number == 1 ? 2 : button_number == 2 ? 1 : button_number;
+
+          FlutterPointerEvent event = {
+              .struct_size    = sizeof(event),
+              .phase          = state == WL_POINTER_BUTTON_STATE_PRESSED ? FlutterPointerPhase::kDown : FlutterPointerPhase::kUp,
+              .timestamp      = time * 1000,
+              .x              = wl_fixed_to_double(wd->surface_x),
+              .y              = wl_fixed_to_double(wd->surface_y),
+              .device         = 0,
+              .signal_kind    = kFlutterPointerSignalKindNone,
+              .scroll_delta_x = 0,
+              .scroll_delta_y = 0,
+              .device_kind    = static_cast<FlutterPointerDeviceKind>(1 << button_number),
+              .buttons        = 0,
+          };
+          // FlutterEngineSendPointerEvent(reinterpret_cast<FlutterEngine>(glfwGetWindowUserPointer(window)), &event, 1);
         },
-    .axis =
-        [](void *data, struct wl_pointer *wl_pointer, uint32_t time, uint32_t axis, wl_fixed_t value) {
 
-        },
-    .frame =
-        [](void *data, struct wl_pointer *wl_pointer) {
+    .axis = [](void *data, struct wl_pointer *wl_pointer, uint32_t time, uint32_t axis, wl_fixed_t value) {},
 
-        },
+    .frame = [](void *data, struct wl_pointer *wl_pointer) {},
 
-    .axis_source =
-        [](void *data, struct wl_pointer *wl_pointer, uint32_t axis_source) {
+    .axis_source = [](void *data, struct wl_pointer *wl_pointer, uint32_t axis_source) {},
 
-        },
-    .axis_stop =
-        [](void *data, struct wl_pointer *wl_pointer, uint32_t time, uint32_t axis) {
+    .axis_stop = [](void *data, struct wl_pointer *wl_pointer, uint32_t time, uint32_t axis) {},
 
-        },
-    .axis_discrete =
-        [](void *data, struct wl_pointer *wl_pointer, uint32_t axis, int32_t discrete) {
-
-        },
+    .axis_discrete = [](void *data, struct wl_pointer *wl_pointer, uint32_t axis, int32_t discrete) {},
 
 };
 
@@ -95,7 +104,8 @@ const wl_keyboard_listener WaylandDisplay::kKeyboardListener = {
           WaylandDisplay *wd = DISPLAY;
           assert(wd);
 
-          char *keymap_string = reinterpret_cast<char *>(mmap(nullptr, size, PROT_READ, MAP_SHARED, fd, 0));
+          wd->keymap_format         = static_cast<wl_keyboard_keymap_format>(format);
+          char *const keymap_string = reinterpret_cast<char *const>(mmap(nullptr, size, PROT_READ, MAP_PRIVATE, fd, 0));
           xkb_keymap_unref(wd->keymap);
           wd->keymap = xkb_keymap_new_from_string(wd->xkb_context, keymap_string, XKB_KEYMAP_FORMAT_TEXT_V1, XKB_KEYMAP_COMPILE_NO_FLAGS);
           munmap(keymap_string, size);
@@ -103,17 +113,23 @@ const wl_keyboard_listener WaylandDisplay::kKeyboardListener = {
           xkb_state_unref(wd->xkb_state);
           wd->xkb_state = xkb_state_new(wd->keymap);
         },
-    .enter = [](void *data, struct wl_keyboard *wl_keyboard, uint32_t serial, struct wl_surface *surface, struct wl_array *keys) {
-      printf("keyboard enter\n"); },
-    .leave = [](void *data, struct wl_keyboard *wl_keyboard, uint32_t serial, struct wl_surface *surface) {
-      printf("keyboard leave\n"); },
+
+    .enter = [](void *data, struct wl_keyboard *wl_keyboard, uint32_t serial, struct wl_surface *surface, struct wl_array *keys) { printf("keyboard enter\n"); },
+
+    .leave = [](void *data, struct wl_keyboard *wl_keyboard, uint32_t serial, struct wl_surface *surface) { printf("keyboard leave\n"); },
+
     .key =
         [](void *data, struct wl_keyboard *wl_keyboard, uint32_t serial, uint32_t time, uint32_t key, uint32_t state) {
           if (state == WL_KEYBOARD_KEY_STATE_PRESSED) {
             WaylandDisplay *wd = DISPLAY;
             assert(wd);
 
-            xkb_keysym_t keysym = xkb_state_key_get_one_sym(wd->xkb_state, key + 8);
+            if (wd->keymap_format == WL_KEYBOARD_KEYMAP_FORMAT_NO_KEYMAP) {
+              printf("Hmm - no keymap, no key\n");
+              return;
+            }
+
+            xkb_keysym_t keysym = xkb_state_key_get_one_sym(wd->xkb_state, key + (wd->keymap_format * 8));
             uint32_t utf32      = xkb_keysym_to_utf32(keysym);
 
             if (utf32) {
@@ -129,6 +145,7 @@ const wl_keyboard_listener WaylandDisplay::kKeyboardListener = {
             }
           }
         },
+
     .modifiers =
         [](void *data, struct wl_keyboard *wl_keyboard, uint32_t serial, uint32_t mods_depressed, uint32_t mods_latched, uint32_t mods_locked, uint32_t group) {
           WaylandDisplay *wd = DISPLAY;
@@ -136,6 +153,7 @@ const wl_keyboard_listener WaylandDisplay::kKeyboardListener = {
 
           xkb_state_update_mask(wd->xkb_state, mods_depressed, mods_latched, mods_locked, 0, 0, group);
         },
+
     .repeat_info = [](void *data, struct wl_keyboard *wl_keyboard, int32_t rate, int32_t delay) {},
 };
 
