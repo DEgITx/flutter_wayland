@@ -93,7 +93,7 @@ const wl_pointer_listener WaylandDisplay::kPointerListener = {
         [](void *data, struct wl_pointer *wl_pointer, uint32_t time, wl_fixed_t surface_x, wl_fixed_t surface_y) {
           WaylandDisplay *wd = DISPLAY;
           assert(wd);
-
+          // just store raw values
           wd->surface_x = surface_x;
           wd->surface_y = surface_y;
         },
@@ -103,7 +103,7 @@ const wl_pointer_listener WaylandDisplay::kPointerListener = {
           WaylandDisplay *wd = DISPLAY;
           assert(wd);
 
-          uint32_t button_number = button - 1;
+          uint32_t button_number = button - 0x110; // dw: 0x110 is BTN_LEFT - a magic value from the header we don't want to pull in as a build dependency
           button_number          = button_number == 1 ? 2 : button_number == 2 ? 1 : button_number;
 
           FlutterPointerEvent event = {
@@ -116,10 +116,11 @@ const wl_pointer_listener WaylandDisplay::kPointerListener = {
               .signal_kind    = kFlutterPointerSignalKindNone,
               .scroll_delta_x = 0,
               .scroll_delta_y = 0,
-              .device_kind    = static_cast<FlutterPointerDeviceKind>(1 << button_number),
+              .device_kind    = static_cast<FlutterPointerDeviceKind>(0), // dw: TODO: Why kFlutterPointerDeviceKindMouse does not work?
               .buttons        = 0,
           };
-          // FlutterEngineSendPointerEvent(reinterpret_cast<FlutterEngine>(glfwGetWindowUserPointer(window)), &event, 1);
+
+          FlutterEngineSendPointerEvent(wd->engine_, &event, 1);
         },
 
     .axis = [](void *data, struct wl_pointer *wl_pointer, uint32_t time, uint32_t axis, wl_fixed_t value) {},

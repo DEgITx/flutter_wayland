@@ -7,7 +7,6 @@
 #include <string>
 #include <vector>
 
-
 #include "utils.h"
 #include "wayland_display.h"
 
