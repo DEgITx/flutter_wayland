@@ -1,2 +1,0 @@
-#!/bin/bash
-LD_LIBRARY_PATH=/home/sw/projects/flutter/flutter_wayland/src ${ENTRYPOINT} /home/sw/projects/flutter/flutter_wayland/src/flutter.bin "$@"

@@ -7,6 +7,7 @@ cmake_minimum_required(VERSION 3.3)
 project(flutter-launcher-wayland)
 
 find_package(PkgConfig)
+pkg_search_module(GLFW glfw3 REQUIRED) # dw: Not used for linking, we just need an access to the header
 pkg_search_module(XKB xkbcommon REQUIRED)
 pkg_search_module(EGL egl REQUIRED)
 pkg_search_module(WAYLAND_CLIENT wayland-client REQUIRED)
@@ -42,8 +43,11 @@ link_directories(
 
 add_executable(flutter-launcher-wayland ${SOURCES})
 
+target_compile_definitions(flutter-launcher-wayland PRIVATE "-DGLFW_INCLUDE_ES2")
+
 target_include_directories(flutter-launcher-wayland
   PRIVATE
+  ${GLFW_INCLUDE_DIRS}
   ${XKB_INCLUDE_DIRS}
   ${EGL_INCLUDE_DIRS}
   ${WAYLAND_CLIENT_INCLUDE_DIRS}

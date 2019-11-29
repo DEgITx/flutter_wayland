@@ -19,6 +19,7 @@
 #include <poll.h>
 #include <errno.h>
 #include <sys/mman.h>
+#include <linux/input-event-codes.h>
 
 #include "utils.h"
 #include "wayland_display.h"
@@ -91,7 +92,7 @@ const wl_pointer_listener WaylandDisplay::kPointerListener = {
 
     .motion =
         [](void *data, struct wl_pointer *wl_pointer, uint32_t time, wl_fixed_t surface_x, wl_fixed_t surface_y) {
-          WaylandDisplay *wd = DISPLAY;
+          WaylandDisplay *const wd = DISPLAY;
           assert(wd);
           // just store raw values
           wd->surface_x = surface_x;
@@ -100,10 +101,10 @@ const wl_pointer_listener WaylandDisplay::kPointerListener = {
 
     .button =
         [](void *data, struct wl_pointer *wl_pointer, uint32_t serial, uint32_t time, uint32_t button, uint32_t state) {
-          WaylandDisplay *wd = DISPLAY;
+          WaylandDisplay *const wd = DISPLAY;
           assert(wd);
 
-          uint32_t button_number = button - 0x110; // dw: 0x110 is BTN_LEFT - a magic value from the header we don't want to pull in as a build dependency
+          uint32_t button_number = button - BTN_LEFT;
           button_number          = button_number == 1 ? 2 : button_number == 2 ? 1 : button_number;
 
           FlutterPointerEvent event = {
@@ -138,7 +139,7 @@ const wl_pointer_listener WaylandDisplay::kPointerListener = {
 const wl_keyboard_listener WaylandDisplay::kKeyboardListener = {
     .keymap =
         [](void *data, struct wl_keyboard *wl_keyboard, uint32_t format, int32_t fd, uint32_t size) {
-          WaylandDisplay *wd = DISPLAY;
+          WaylandDisplay *const wd = DISPLAY;
           assert(wd);
 
           wd->keymap_format         = static_cast<wl_keyboard_keymap_format>(format);
@@ -157,35 +158,62 @@ const wl_keyboard_listener WaylandDisplay::kKeyboardListener = {
 
     .key =
         [](void *data, struct wl_keyboard *wl_keyboard, uint32_t serial, uint32_t time, uint32_t key, uint32_t state) {
-          if (state == WL_KEYBOARD_KEY_STATE_PRESSED) {
-            WaylandDisplay *wd = DISPLAY;
-            assert(wd);
+          WaylandDisplay *const wd = DISPLAY;
+          assert(wd);
 
-            if (wd->keymap_format == WL_KEYBOARD_KEYMAP_FORMAT_NO_KEYMAP) {
-              printf("Hmm - no keymap, no key\n");
-              return;
-            }
+          if (wd->keymap_format == WL_KEYBOARD_KEYMAP_FORMAT_NO_KEYMAP) {
+            printf("Hmm - no keymap, no key\n");
+            return;
+          }
 
-            xkb_keysym_t keysym = xkb_state_key_get_one_sym(wd->xkb_state, key + (wd->keymap_format * 8));
-            uint32_t utf32      = xkb_keysym_to_utf32(keysym);
+          xkb_keysym_t keysym = xkb_state_key_get_one_sym(wd->xkb_state, key + (wd->keymap_format * 8));
+          uint32_t utf32      = xkb_keysym_to_utf32(keysym);
 
-            if (utf32) {
-              if (utf32 >= 0x21 && utf32 <= 0x7E) {
-                printf("the key %c was pressed\n", (char)utf32);
-              } else {
-                printf("the key U+%04X was pressed\n", utf32);
-              }
+          if (utf32) {
+            if (utf32 >= 0x21 && utf32 <= 0x7E) {
+              printf("the key %c was pressed\n", (char)utf32);
             } else {
-              char name[64];
-              xkb_keysym_get_name(keysym, name, sizeof(name));
-              printf("the key %s was pressed\n", name);
+              printf("the key U+%04X was pressed\n", utf32);
+            }
+          } else {
+            char name[64];
+            xkb_keysym_get_name(keysym, name, sizeof(name));
+
+            printf("the key %s was pressed\n", name);
+          }
+
+          std::string message;
+
+          // dw: if you do not like so many backslashes,
+          // please consider to rerwite it using RapidJson.
+          message += "{";
+          message += "\"keyCode\":" + std::to_string(toGLFWKeyCode(key));
+          message += ",\"keymap\":\"linux\"";
+          message += ",\"scanCode\":" + std::to_string(key);
+          message += ",\"modifiers\":0";      // dw TODO: not implemented
+          message += ",\"toolkit\":\"glfw\""; // dw: why they choose to use "glfw" toolkit?
+          message += ",\"type\":\"";
+
+          if (state == WL_KEYBOARD_KEY_STATE_PRESSED)
+            message += "keydown";
+          else
+            message += "keyup";
+
+          message += "\"";
+          message += "}";
+
+          if (!message.empty()) {
+            bool success = FlutterSendMessage(wd->engine_, "flutter/keyevent", reinterpret_cast<const uint8_t *>(message.c_str()), message.size());
+
+            if (!success) {
+              FLWAY_ERROR << "Error sending PlatformMessage: " << message << std::endl;
             }
           }
         },
 
     .modifiers =
         [](void *data, struct wl_keyboard *wl_keyboard, uint32_t serial, uint32_t mods_depressed, uint32_t mods_latched, uint32_t mods_locked, uint32_t group) {
-          WaylandDisplay *wd = DISPLAY;
+          WaylandDisplay *const wd = DISPLAY;
           assert(wd);
 
           xkb_state_update_mask(wd->xkb_state, mods_depressed, mods_latched, mods_locked, 0, 0, group);
@@ -199,7 +227,7 @@ const wl_seat_listener WaylandDisplay::kSeatListener = {
         [](void *data, struct wl_seat *seat, uint32_t capabilities) {
           printf("capabilities(data:%p, seat:%p, capabilities:0x%x)\n", data, seat, capabilities);
 
-          WaylandDisplay *wd = DISPLAY;
+          WaylandDisplay *const wd = DISPLAY;
           assert(wd);
           assert(seat == wd->seat_);
 
@@ -243,6 +271,7 @@ WaylandDisplay::WaylandDisplay(size_t width, size_t height, const std::string &b
   }
 
   registry_ = wl_display_get_registry(display_);
+
   if (!registry_) {
     FLWAY_ERROR << "Could not get the wayland registry." << std::endl;
     return;
@@ -320,9 +349,11 @@ bool WaylandDisplay::SetupEngine(const std::string &bundle_path, const std::vect
 
 WaylandDisplay::~WaylandDisplay() {
 
-  if (engine_ == nullptr) {
+  if (engine_) {
     auto result = FlutterEngineShutdown(engine_);
-    if (result != kSuccess) {
+    if (result == kSuccess) {
+      engine_ = nullptr;
+    } else {
       FLWAY_ERROR << "Could not shutdown the Flutter engine." << std::endl;
     }
   }
