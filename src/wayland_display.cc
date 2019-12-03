@@ -181,7 +181,7 @@ const wl_keyboard_listener WaylandDisplay::kKeyboardListener = {
             char name[64];
             xkb_keysym_get_name(keysym, name, sizeof(name));
 
-            printf("the key %s was pressed\n", name);
+            printf("the key %s was %s\n", name, state == WL_KEYBOARD_KEY_STATE_PRESSED ? "pressed" : "released");
           }
 
           std::string message;
