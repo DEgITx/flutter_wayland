@@ -54,8 +54,8 @@ static bool Main(std::vector<std::string> args) {
     return false;
   }
 
-  const size_t kWidth  = 800;
-  const size_t kHeight = 600;
+  const size_t kWidth  = 1920;
+  const size_t kHeight = 1080;
 
   for (const auto &arg : args) {
     FLWAY_LOG << "Arg: " << arg << std::endl;
