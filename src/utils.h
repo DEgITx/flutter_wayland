@@ -1,4 +1,5 @@
 // Copyright 2018 The Flutter Authors. All rights reserved.
+// Copyright 2019 Damian Wrobel <dwrobel@ertelnet.rybnik.pl>
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -18,7 +19,5 @@ bool FileExistsAtPath(const std::string &path);
 bool FlutterAssetBundleIsValid(const std::string &bundle_path);
 
 bool FlutterSendMessage(FlutterEngine engine, const char *channel, const uint8_t *message, const size_t message_size);
-
-int toGLFWKeyCode(const uint32_t key);
 
 } // namespace flutter

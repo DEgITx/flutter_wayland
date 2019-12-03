@@ -1,4 +1,5 @@
 // Copyright 2018 The Flutter Authors. All rights reserved.
+// Copyright 2019 Damian Wrobel <dwrobel@ertelnet.rybnik.pl>
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -21,6 +22,7 @@
 #include <sys/mman.h>
 #include <linux/input-event-codes.h>
 
+#include "keys.h"
 #include "utils.h"
 #include "wayland_display.h"
 

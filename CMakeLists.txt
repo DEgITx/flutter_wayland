@@ -26,9 +26,11 @@ endif()
 
 set(SOURCES
     src/main.cc
+    src/keys.cc
     src/utils.cc
     src/wayland_display.cc
     src/macros.h
+    src/keys.h
     src/utils.h
     src/wayland_display.h
 )
