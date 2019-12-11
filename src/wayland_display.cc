@@ -22,6 +22,7 @@
 #include <sys/mman.h>
 #include <linux/input-event-codes.h>
 
+#include "elf.h"
 #include "keys.h"
 #include "utils.h"
 #include "wayland_display.h"
@@ -332,6 +333,24 @@ bool WaylandDisplay::SetupEngine(const std::string &bundle_path, const std::vect
       .command_line_argc = static_cast<int>(command_line_args_c.size()),
       .command_line_argv = command_line_args_c.data(),
   };
+
+  std::string libapp_aot_path = bundle_path + "/" + FlutterGetAppAotElfName(); // dw: TODO: There seems to be no convention name we could use, so let's temporary hardcode the path.
+
+  if (FlutterEngineRunsAOTCompiledDartCode()) {
+    FLWAY_LOG << "Using AOT precompiled runtime." << std::endl;
+
+    if (std::ifstream(libapp_aot_path)) {
+      FLWAY_LOG << "Lading AOT snapshot: " << libapp_aot_path << std::endl;
+
+      const char *error;
+      auto handle = Aot_LoadELF(libapp_aot_path.c_str(), 0, &error, &args.vm_snapshot_data, &args.vm_snapshot_instructions, &args.isolate_snapshot_data, &args.isolate_snapshot_instructions);
+
+      if (!handle) {
+        FLWAY_ERROR << "Could not load AOT library: " << libapp_aot_path << " (error: " << error << ")" << std::endl;
+        return false;
+      }
+    }
+  }
 
   auto result = FlutterEngineRun(FLUTTER_ENGINE_VERSION, &config, &args, this /* userdata */, &engine_);
 

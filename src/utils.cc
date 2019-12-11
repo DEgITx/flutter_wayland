@@ -50,12 +50,21 @@ bool FlutterAssetBundleIsValid(const std::string &bundle_path) {
     return false;
   }
 
-  if (!FileExistsAtPath(bundle_path + std::string{"/kernel_blob.bin"})) {
-    FLWAY_ERROR << "Kernel blob does not exist." << std::endl;
+  auto kernel_path = bundle_path + std::string{"/kernel_blob.bin"};
+  auto aotelf_path = bundle_path + std::string{"/"} + FlutterGetAppAotElfName();
+  auto kernel      = FileExistsAtPath(kernel_path);
+  auto aotelf      = FileExistsAtPath(aotelf_path);
+
+  if (!(kernel || aotelf)) {
+    FLWAY_ERROR << "Could not found neither " << kernel_path << " nor " << aotelf_path << std::endl;
     return false;
   }
 
   return true;
+}
+
+std::string FlutterGetAppAotElfName() {
+  return std::string("app-aot-elf.so"); // dw: TODO: There seems to be no convention name we could use, so let's temporary hardcode the file name.
 }
 
 bool FlutterSendMessage(FlutterEngine engine, const char *channel, const uint8_t *message, const size_t message_size) {

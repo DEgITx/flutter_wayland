@@ -18,6 +18,8 @@ bool FileExistsAtPath(const std::string &path);
 
 bool FlutterAssetBundleIsValid(const std::string &bundle_path);
 
+std::string FlutterGetAppAotElfName();
+
 bool FlutterSendMessage(FlutterEngine engine, const char *channel, const uint8_t *message, const size_t message_size);
 
 } // namespace flutter

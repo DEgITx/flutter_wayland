@@ -20,12 +20,14 @@
 //    distribution.
 //
 
-#pragma once
-
-#include <stdint.h>
-
 namespace flutter {
 
-int toGLFWKeyCode(const uint32_t key);
+typedef struct {
+} Aot_LoadedElf;
+
+// Modeled after Dart_LoadELF() however, it is based on elfio library and uses directly mmap() instead of relying on any piece of code from the Dart Engine.
+Aot_LoadedElf *Aot_LoadELF(const char *filename, const uint64_t file_offset, const char **error, const uint8_t **vm_snapshot_data, const uint8_t **vm_snapshot_instrs, const uint8_t **vm_isolate_data, const uint8_t **vm_isolate_instrs);
+
+void Aot_UnloadELF(Aot_LoadedElf *loaded);
 
 } // namespace flutter
