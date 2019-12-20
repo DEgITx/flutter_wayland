@@ -60,6 +60,9 @@ private:
   EGLSurface egl_surface_          = nullptr;
   EGLContext egl_context_          = EGL_NO_CONTEXT;
 
+  EGLSurface resource_egl_surface_          = nullptr;
+  EGLContext resource_egl_context_          = EGL_NO_CONTEXT;
+
   FlutterEngine engine_ = nullptr;
 
   bool SetupEGL();
@@ -73,6 +76,8 @@ private:
   bool StopRunning();
 
   bool OnApplicationContextMakeCurrent();
+
+  bool OnApplicationMakeResourceCurrent();
 
   bool OnApplicationContextClearCurrent();
 

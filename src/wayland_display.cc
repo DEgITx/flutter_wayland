@@ -305,6 +305,8 @@ bool WaylandDisplay::SetupEngine(const std::string &bundle_path, const std::vect
   config.open_gl.clear_current    = [](void *userdata) -> bool { return reinterpret_cast<WaylandDisplay *>(userdata)->OnApplicationContextClearCurrent(); };
   config.open_gl.present          = [](void *userdata) -> bool { return reinterpret_cast<WaylandDisplay *>(userdata)->OnApplicationPresent(); };
   config.open_gl.fbo_callback     = [](void *userdata) -> uint32_t { return reinterpret_cast<WaylandDisplay *>(userdata)->OnApplicationGetOnscreenFBO(); };
+  config.open_gl.make_resource_current     = [](void *userdata) -> bool { return reinterpret_cast<WaylandDisplay *>(userdata)->OnApplicationMakeResourceCurrent(); };
+
   config.open_gl.gl_proc_resolver = [](void *userdata, const char *name) -> void * {
     auto address = eglGetProcAddress(name);
     if (address != nullptr) {
@@ -555,11 +557,11 @@ bool WaylandDisplay::SetupEGL() {
     }
   }
 
+  const EGLint ctx_attribs[] = {EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE};
+
   // Create an EGL context with the match config.
   {
-    const EGLint attribs[] = {EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE};
-
-    egl_context_ = eglCreateContext(egl_display_, egl_config, nullptr /* share group */, attribs);
+    egl_context_ = eglCreateContext(egl_display_, egl_config, nullptr /* share group */, ctx_attribs);
 
     if (egl_context_ == EGL_NO_CONTEXT) {
       LogLastEGLError();
@@ -599,6 +601,15 @@ bool WaylandDisplay::SetupEGL() {
     FLWAY_ERROR << "Could not create EGL window." << std::endl;
     return false;
   }
+
+  const EGLint pbuffer_config_attribs[] = {
+      EGL_HEIGHT, 64,
+      EGL_WIDTH, 64,
+      EGL_NONE
+  };
+
+  resource_egl_context_ = eglCreateContext(egl_display_, egl_config, egl_context_ /* share group */, ctx_attribs);
+  resource_egl_surface_ = eglCreatePbufferSurface(egl_display_, egl_config, pbuffer_config_attribs);
 
   // Create an EGL window surface with the matched config.
   {
@@ -643,6 +654,16 @@ bool WaylandDisplay::OnApplicationContextMakeCurrent() {
   if (eglMakeCurrent(egl_display_, egl_surface_, egl_surface_, egl_context_) != EGL_TRUE) {
     LogLastEGLError();
     FLWAY_ERROR << "Could not make the onscreen context current" << std::endl;
+    return false;
+  }
+
+  return true;
+}
+
+bool WaylandDisplay::OnApplicationMakeResourceCurrent() {
+  if (eglMakeCurrent(egl_display_, resource_egl_surface_, resource_egl_surface_, resource_egl_context_) != EGL_TRUE) {
+    LogLastEGLError();
+    FLWAY_ERROR << "Could not make the RESOURCE context current" << std::endl;
     return false;
   }
 
