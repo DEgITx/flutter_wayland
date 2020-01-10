@@ -298,14 +298,14 @@ WaylandDisplay::WaylandDisplay(size_t width, size_t height, const std::string &b
 }
 
 bool WaylandDisplay::SetupEngine(const std::string &bundle_path, const std::vector<std::string> &command_line_args) {
-  FlutterRendererConfig config    = {};
-  config.type                     = kOpenGL;
-  config.open_gl.struct_size      = sizeof(config.open_gl);
-  config.open_gl.make_current     = [](void *userdata) -> bool { return reinterpret_cast<WaylandDisplay *>(userdata)->OnApplicationContextMakeCurrent(); };
-  config.open_gl.clear_current    = [](void *userdata) -> bool { return reinterpret_cast<WaylandDisplay *>(userdata)->OnApplicationContextClearCurrent(); };
-  config.open_gl.present          = [](void *userdata) -> bool { return reinterpret_cast<WaylandDisplay *>(userdata)->OnApplicationPresent(); };
-  config.open_gl.fbo_callback     = [](void *userdata) -> uint32_t { return reinterpret_cast<WaylandDisplay *>(userdata)->OnApplicationGetOnscreenFBO(); };
-  config.open_gl.make_resource_current     = [](void *userdata) -> bool { return reinterpret_cast<WaylandDisplay *>(userdata)->OnApplicationMakeResourceCurrent(); };
+  FlutterRendererConfig config         = {};
+  config.type                          = kOpenGL;
+  config.open_gl.struct_size           = sizeof(config.open_gl);
+  config.open_gl.make_current          = [](void *userdata) -> bool { return reinterpret_cast<WaylandDisplay *>(userdata)->OnApplicationContextMakeCurrent(); };
+  config.open_gl.clear_current         = [](void *userdata) -> bool { return reinterpret_cast<WaylandDisplay *>(userdata)->OnApplicationContextClearCurrent(); };
+  config.open_gl.present               = [](void *userdata) -> bool { return reinterpret_cast<WaylandDisplay *>(userdata)->OnApplicationPresent(); };
+  config.open_gl.fbo_callback          = [](void *userdata) -> uint32_t { return reinterpret_cast<WaylandDisplay *>(userdata)->OnApplicationGetOnscreenFBO(); };
+  config.open_gl.make_resource_current = [](void *userdata) -> bool { return reinterpret_cast<WaylandDisplay *>(userdata)->OnApplicationMakeResourceCurrent(); };
 
   config.open_gl.gl_proc_resolver = [](void *userdata, const char *name) -> void * {
     auto address = eglGetProcAddress(name);
@@ -602,11 +602,7 @@ bool WaylandDisplay::SetupEGL() {
     return false;
   }
 
-  const EGLint pbuffer_config_attribs[] = {
-      EGL_HEIGHT, 64,
-      EGL_WIDTH, 64,
-      EGL_NONE
-  };
+  const EGLint pbuffer_config_attribs[] = {EGL_HEIGHT, 64, EGL_WIDTH, 64, EGL_NONE};
 
   resource_egl_context_ = eglCreateContext(egl_display_, egl_config, egl_context_ /* share group */, ctx_attribs);
   resource_egl_surface_ = eglCreatePbufferSurface(egl_display_, egl_config, pbuffer_config_attribs);
