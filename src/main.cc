@@ -57,11 +57,13 @@ static bool Main(std::vector<std::string> args) {
   const size_t kWidth  = 1920;
   const size_t kHeight = 1080;
 
-  for (const auto &arg : args) {
-    FLWAY_LOG << "Arg: " << arg << std::endl;
+  const std::vector<std::string> flutter_args(args.begin() + 1, args.end());
+
+  for (const auto &arg : flutter_args) {
+    FLWAY_LOG << "Flutter arg: " << arg << std::endl;
   }
 
-  WaylandDisplay display(kWidth, kHeight, asset_bundle_path, args);
+  WaylandDisplay display(kWidth, kHeight, asset_bundle_path, flutter_args);
 
   if (!display.IsValid()) {
     FLWAY_ERROR << "Wayland display was not valid." << std::endl;
