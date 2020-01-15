@@ -1,4 +1,4 @@
-// Copyrithg (c) 2019 Damian Wrobel <dwrobel@ertelnet.rybnik.pl>
+// Copyrithg (c) 2019-2020 Damian Wrobel <dwrobel@ertelnet.rybnik.pl>
 //
 // This software is provided 'as-is', without any express or implied
 // warranty. In no event will the authors be held liable for any damages
@@ -21,17 +21,10 @@
 //
 
 #include <memory>
-#include <elfio/elfio.hpp>
-#include <sys/mman.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-
+#include <cstring>
+#include <dlfcn.h>
 #include "elf.h"
 #include "macros.h"
-
-namespace elfio = ::ELFIO;
 
 namespace flutter {
 
@@ -41,23 +34,17 @@ public:
       : filename(strdup(filename), std::free)
       , elf_data_offset(elf_data_offset)
       , error_(nullptr)
-      , fd(-1)
-      , vm_snapshot_data_(MAP_FAILED)
-      , vm_snapshot_instructions_(MAP_FAILED)
-      , vm_isolate_snapshot_data_(MAP_FAILED)
-      , vm_isolate_snapshot_instructions_(MAP_FAILED)
-      , vm_snapshot_data_size(0)
-      , vm_snapshot_instructions_size(0)
-      , vm_isolate_snapshot_data_size(0)
-      , vm_isolate_snapshot_instructions_size(0) {
+      , fd(NULL)
+      , vm_snapshot_data_(NULL)
+      , vm_snapshot_instructions_(NULL)
+      , vm_isolate_snapshot_data_(NULL)
+      , vm_isolate_snapshot_instructions_(NULL) {
   }
 
   ~LoadedElf() {
-    unmap_all();
-
-    if (fd != -1) {
-      close(fd);
-      fd = -1;
+    if (fd) {
+      dlclose(fd);
+      fd = NULL;
     }
   }
 
@@ -66,13 +53,9 @@ public:
       return false; // not supported
     }
 
-    if (!reader.load(filename.get())) {
-      return false;
-    }
+    fd = dlopen(filename.get(), RTLD_LOCAL | RTLD_NOW);
 
-    fd = open(filename.get(), 0, O_RDONLY);
-
-    if (fd == -1) {
+    if (fd == NULL) {
       return false;
     }
 
@@ -86,65 +69,38 @@ public:
 
     *vm_snapshot_data = *vm_snapshot_instructions = *vm_isolate_snapshot_data = *vm_isolate_snapshot_instructions = nullptr;
 
-    const elfio::Elf_Half sec_num = reader.sections.size();
+    do {
 
-    for (auto i = 0; i < sec_num; i++) {
-      elfio::section *const psec = reader.sections[i];
+      vm_snapshot_instructions_ = dlsym(fd, "_kDartVmSnapshotInstructions");
 
-      if (psec->get_type() == SHT_DYNSYM) {
-        const elfio::symbol_section_accessor symbols(reader, psec);
-
-        FLWAY_LOG << " [" << i << "] " << psec->get_name() << "\t" << psec->get_size() << std::endl;
-
-        for (auto j = 0; j < symbols.get_symbols_num(); j++) {
-          std::string name;
-          elfio::Elf64_Addr addr;
-          elfio::Elf_Xword size;
-          unsigned char bind;
-          unsigned char type;
-          elfio::Elf_Half section_index;
-          unsigned char other;
-
-          symbols.get_symbol(j, name, addr, size, bind, type, section_index, other);
-
-          FLWAY_LOG << j << " " << name << " addr: 0x" << std::hex << addr << " size: 0x" << size << " index: " << std::dec << section_index << std::endl;
-
-          if (std::string("_kDartVmSnapshotInstructions").compare(name) == 0) {
-            vm_snapshot_instructions_ = reinterpret_cast<uint8_t *>(mmap(nullptr, vm_snapshot_instructions_size = size, PROT_READ | PROT_EXEC, MAP_PRIVATE | MAP_POPULATE, fd, addr));
-
-            if (vm_snapshot_instructions_ == MAP_FAILED) {
-              error_ = strerror(errno);
-              break;
-            }
-          } else if (std::string("_kDartIsolateSnapshotInstructions").compare(name) == 0) {
-            vm_isolate_snapshot_instructions_ = reinterpret_cast<uint8_t *>(mmap(nullptr, vm_isolate_snapshot_instructions_size = size, PROT_READ | PROT_EXEC, MAP_PRIVATE | MAP_POPULATE, fd, addr));
-
-            if (vm_isolate_snapshot_instructions_ == MAP_FAILED) {
-              error_ = strerror(errno);
-              break;
-            }
-          } else if (std::string("_kDartVmSnapshotData").compare(name) == 0) {
-            vm_snapshot_data_ = reinterpret_cast<uint8_t *>(mmap(nullptr, vm_snapshot_data_size = size, PROT_READ, MAP_PRIVATE | MAP_POPULATE, fd, addr));
-
-            if (vm_snapshot_data_ == MAP_FAILED) {
-              error_ = strerror(errno);
-              break;
-            }
-          } else if (std::string("_kDartIsolateSnapshotData").compare(name) == 0) {
-            vm_isolate_snapshot_data_ = reinterpret_cast<uint8_t *>(mmap(nullptr, vm_isolate_snapshot_data_size = size, PROT_READ, MAP_PRIVATE | MAP_POPULATE, fd, addr));
-
-            if (vm_isolate_snapshot_data_ == MAP_FAILED) {
-              error_ = strerror(errno);
-              break;
-            }
-          }
-        }
-
+      if (vm_snapshot_instructions_ == NULL) {
+        error_ = strerror(errno);
         break;
       }
-    }
 
-    if (vm_snapshot_data_ == MAP_FAILED || vm_snapshot_instructions_ == MAP_FAILED || vm_isolate_snapshot_data_ == MAP_FAILED || vm_isolate_snapshot_instructions_ == MAP_FAILED) {
+      vm_isolate_snapshot_instructions_ = dlsym(fd, "_kDartIsolateSnapshotInstructions");
+
+      if (vm_isolate_snapshot_instructions_ == NULL) {
+        error_ = strerror(errno);
+        break;
+      }
+
+      vm_snapshot_data_ = dlsym(fd, "_kDartVmSnapshotData");
+
+      if (vm_snapshot_data_ == NULL) {
+        error_ = strerror(errno);
+        break;
+      }
+
+      vm_isolate_snapshot_data_ = dlsym(fd, "_kDartIsolateSnapshotData");
+
+      if (vm_isolate_snapshot_data_ == NULL) {
+        error_ = strerror(errno);
+        break;
+      }
+    } while (0);
+
+    if (vm_snapshot_data_ == NULL || vm_snapshot_instructions_ == NULL || vm_isolate_snapshot_data_ == NULL || vm_isolate_snapshot_instructions_ == NULL) {
       return false;
     }
 
@@ -164,36 +120,11 @@ protected:
   std::unique_ptr<char, decltype(std::free) *> filename;
   const uint64_t elf_data_offset;
   const char *error_;
-  int fd;
+  void *fd;
   void *vm_snapshot_data_, *vm_snapshot_instructions_, *vm_isolate_snapshot_data_, *vm_isolate_snapshot_instructions_;
-  size_t vm_snapshot_data_size, vm_snapshot_instructions_size, vm_isolate_snapshot_data_size, vm_isolate_snapshot_instructions_size;
-
-  elfio::elfio reader;
 
 private:
   FLWAY_DISALLOW_COPY_AND_ASSIGN(LoadedElf);
-
-  void unmap_all() {
-    if (vm_snapshot_data_ != MAP_FAILED) {
-      munmap(vm_snapshot_data_, vm_snapshot_data_size);
-      vm_snapshot_data_ = MAP_FAILED;
-    }
-
-    if (vm_snapshot_instructions_ != MAP_FAILED) {
-      munmap(vm_snapshot_instructions_, vm_snapshot_instructions_size);
-      vm_snapshot_instructions_ = MAP_FAILED;
-    }
-
-    if (vm_isolate_snapshot_data_ != MAP_FAILED) {
-      munmap(vm_isolate_snapshot_data_, vm_isolate_snapshot_data_size);
-      vm_isolate_snapshot_data_ = MAP_FAILED;
-    }
-
-    if (vm_isolate_snapshot_instructions_ != MAP_FAILED) {
-      munmap(vm_isolate_snapshot_instructions_, vm_isolate_snapshot_instructions_size);
-      vm_isolate_snapshot_instructions_ = MAP_FAILED;
-    }
-  }
 };
 
 Aot_LoadedElf *Aot_LoadELF(const char *filename, const uint64_t file_offset, const char **error, const uint8_t **vm_snapshot_data, const uint8_t **vm_snapshot_instrs, const uint8_t **vm_isolate_snapshot_data,

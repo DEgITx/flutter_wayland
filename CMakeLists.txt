@@ -16,11 +16,6 @@ pkg_search_module(WAYLAND_EGL wayland-egl REQUIRED)
 # just provide all FLUTTER_ENGINE* variables using -D
 pkg_search_module(FLUTTER_ENGINE flutter-engine)
 
-find_path(ELFIO_INCLUDE_DIR NAMES "elfio/elfio.hpp")
-if ("${ELFIO_INCLUDE_DIR}" STREQUAL "ELFIO_INCLUDE_DIR-NOTFOUND")
-  message(FATAL_ERROR "Could not found elfio library.")
-endif()
-
 if (CMAKE_VERSION VERSION_LESS "3.8.2")
   set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
 else()
@@ -62,10 +57,10 @@ target_include_directories(flutter-launcher-wayland
   ${WAYLAND_CLIENT_INCLUDE_DIRS}
   ${WAYLAND_EGL_INCLUDE_DIRS}
   ${FLUTTER_ENGINE_INCLUDE_DIRS}
-  ${ELFIO_INCLUDE_DIR}
 )
 
 target_link_libraries(flutter-launcher-wayland
+  ${CMAKE_DL_LIBS}
   ${XKB_LIBRARIES}
   ${EGL_LIBRARIES}
   ${WAYLAND_CLIENT_LIBRARIES}
