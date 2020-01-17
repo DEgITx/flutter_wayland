@@ -13,6 +13,7 @@
 #include <vector>
 #include <functional>
 
+#include <dlfcn.h>
 #include <cstring>
 #include <cassert>
 #include <stdlib.h>
@@ -312,6 +313,15 @@ bool WaylandDisplay::SetupEngine(const std::string &bundle_path, const std::vect
     if (address != nullptr) {
       return reinterpret_cast<void *>(address);
     }
+
+    FLWAY_LOG << "Using dlsym fallback to resolve: " << name << std::endl;
+
+    address = reinterpret_cast<void (*)()>(dlsym(RTLD_DEFAULT, name));
+
+    if (address != nullptr) {
+      return reinterpret_cast<void *>(address);
+    }
+
     FLWAY_ERROR << "Tried unsuccessfully to resolve: " << name << std::endl;
     return nullptr;
   };
