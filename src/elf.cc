@@ -1,4 +1,4 @@
-// Copyrithg (c) 2019-2020 Damian Wrobel <dwrobel@ertelnet.rybnik.pl>
+// Copyright (c) 2019-2020 Damian Wrobel <dwrobel@ertelnet.rybnik.pl>
 //
 // This software is provided 'as-is', without any express or implied
 // warranty. In no event will the authors be held liable for any damages
