@@ -46,8 +46,8 @@ private:
   struct xkb_context *xkb_context         = nullptr;
 
   bool valid_ = false;
-  const int screen_width_;
-  const int screen_height_;
+  int screen_width_;
+  int screen_height_;
   wl_display *display_             = nullptr;
   wl_registry *registry_           = nullptr;
   wl_compositor *compositor_       = nullptr;
