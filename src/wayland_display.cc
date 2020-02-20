@@ -79,9 +79,17 @@ const wl_shell_surface_listener WaylandDisplay::kShellSurfaceListener = {
       if (wd->window_ == nullptr)
         return;
 
-      wl_egl_window_resize(wd->window_, width, height, 0, 0);
+      wl_egl_window_resize(wd->window_, wd->screen_width_ = width, wd->screen_height_ = height, 0, 0);
 
-      FLWAY_LOG << "Window resized: " << width << "x" << height << std::endl;
+      FlutterWindowMetricsEvent event = {};
+      event.struct_size               = sizeof(event);
+      event.width                     = wd->screen_width_;
+      event.height                    = wd->screen_height_;
+      event.pixel_ratio               = 1.0;
+
+      auto success = FlutterEngineSendWindowMetricsEvent(wd->engine_, &event) == kSuccess;
+
+      FLWAY_LOG << "Window resized: " << width << "x" << height << " status: " << (success ? "success" : "failed") << std::endl;
     },
 
     .popup_done = [](void *data, struct wl_shell_surface *wl_shell_surface) -> void {
@@ -376,6 +384,8 @@ bool WaylandDisplay::SetupEngine(const std::string &bundle_path, const std::vect
   event.width                     = screen_width_;
   event.height                    = screen_height_;
   event.pixel_ratio               = 1.0;
+
+  FLWAY_LOG << "WindowMetricEvent: " << event.width << "x" << event.height << std::endl;
 
   return FlutterEngineSendWindowMetricsEvent(engine_, &event) == kSuccess;
 }
