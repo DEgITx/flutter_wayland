@@ -17,6 +17,46 @@ namespace flutter {
 
 #define DISPLAY reinterpret_cast<WaylandDisplay*>(data)
 
+#ifdef USE_XDG_SHELL
+
+void WaylandDisplay::XdgToplevelConfigureHandler(void *data,
+                                                struct xdg_toplevel *xdg_toplevel,
+                                                int32_t width,
+                                                int32_t height,
+                                                struct wl_array *states) {
+}
+
+void WaylandDisplay::XdgToplevelCloseHandler(void *data,
+                                            struct xdg_toplevel *xdg_toplevel) {
+}
+
+const xdg_toplevel_listener WaylandDisplay::kXdgToplevelListener = {
+    .configure = XdgToplevelConfigureHandler,
+    .close = XdgToplevelCloseHandler
+};
+
+void WaylandDisplay::XdgSurfaceConfigureHandler(void *data,
+                                                struct xdg_surface *xdg_surface,
+                                                uint32_t serial) {
+    xdg_surface_ack_configure(xdg_surface, serial);
+}
+
+const xdg_surface_listener WaylandDisplay::kXdgSurfaceListener = {
+    .configure = XdgSurfaceConfigureHandler
+};
+
+void WaylandDisplay::XdgWmBasePingHandler(void *data,
+                                          struct xdg_wm_base *xdg_wm_base,
+                                          uint32_t serial) {
+    xdg_wm_base_pong(xdg_wm_base, serial);
+}
+
+const xdg_wm_base_listener WaylandDisplay::kXdgWmBaseListener = {
+    .ping = XdgWmBasePingHandler
+};
+
+#endif
+
 const wl_registry_listener WaylandDisplay::kRegistryListener = {
     .global = [](void* data,
                  struct wl_registry* wl_registry,
@@ -95,6 +135,13 @@ WaylandDisplay::~WaylandDisplay() {
     wl_shell_destroy(shell_);
     shell_ = nullptr;
   }
+
+#ifdef USE_XDG_SHELL
+  if (xdg_wm_base_) {
+    xdg_wm_base_destroy(xdg_wm_base_);
+    shell_ = nullptr;
+  }
+#endif
 
   if (egl_surface_) {
     eglDestroySurface(egl_display_, egl_surface_);
@@ -195,7 +242,11 @@ static void LogLastEGLError() {
 }
 
 bool WaylandDisplay::SetupEGL() {
-  if (!compositor_ || !shell_) {
+  FLWAY_LOG << "compositor_ = " << compositor_ << " shell_ = " << shell_ << std::endl;
+#ifdef USE_XDG_SHELL
+  FLWAY_LOG << "xdg_wm_base_ = " << xdg_wm_base_ << std::endl;
+#endif
+  if (!compositor_) {
     FLWAY_ERROR << "EGL setup needs missing compositor and shell connection."
                 << std::endl;
     return false;
@@ -208,18 +259,37 @@ bool WaylandDisplay::SetupEGL() {
     return false;
   }
 
-  shell_surface_ = wl_shell_get_shell_surface(shell_, surface_);
+#ifdef USE_XDG_SHELL
+  xdg_wm_base_add_listener(xdg_wm_base_, &kXdgWmBaseListener, NULL);
+  struct xdg_surface *xdg_surface = xdg_wm_base_get_xdg_surface(xdg_wm_base_, surface_);
+  xdg_surface_add_listener(xdg_surface, &kXdgSurfaceListener, NULL);
 
-  if (!shell_surface_) {
-    FLWAY_ERROR << "Could not shell surface." << std::endl;
+  struct xdg_toplevel *xdg_toplevel = xdg_surface_get_toplevel(xdg_surface);
+  xdg_toplevel_add_listener(xdg_toplevel, &kXdgToplevelListener, NULL);
+  xdg_toplevel_set_title(xdg_toplevel, "Flutter");
+
+  // signal that the surface is ready to be configured
+  wl_surface_commit(surface_);
+
+  // wait for the surface to be configured
+  wl_display_roundtrip(display_);
+#else
+  if (shell_) {
+    shell_surface_ = wl_shell_get_shell_surface(shell_, surface_);
+
+    if (!shell_surface_) {
+      FLWAY_ERROR << "Could not shell surface." << std::endl;
+      return false;
+    }
+
+    wl_shell_surface_add_listener(shell_surface_, &kShellSurfaceListener, this);
+    wl_shell_surface_set_title(shell_surface_, "Flutter");
+    wl_shell_surface_set_toplevel(shell_surface_);
+  } else {
+    FLWAY_ERROR << "Not using xdg-shell protocol extension and wl_shell is not available" << std::endl;
     return false;
   }
-
-  wl_shell_surface_add_listener(shell_surface_, &kShellSurfaceListener, this);
-
-  wl_shell_surface_set_title(shell_surface_, "Flutter");
-
-  wl_shell_surface_set_toplevel(shell_surface_);
+#endif
 
   window_ = wl_egl_window_create(surface_, screen_width_, screen_height_);
 
@@ -329,6 +399,14 @@ void WaylandDisplay::AnnounceRegistryInterface(struct wl_registry* wl_registry,
         wl_registry_bind(wl_registry, name, &wl_shell_interface, 1));
     return;
   }
+
+#ifdef USE_XDG_SHELL
+  if (strcmp(interface_name, "xdg_wm_base") == 0) {
+    xdg_wm_base_ = static_cast<decltype(xdg_wm_base_)>(
+        wl_registry_bind(wl_registry, name, &xdg_wm_base_interface, 1));
+    return;
+  }
+#endif
 }
 
 void WaylandDisplay::UnannounceRegistryInterface(

@@ -5,6 +5,15 @@ A Flutter Embedder that talks to Wayland.
 
 ![Running in Weston](assets/image.png)
 
+Zodiac Instructions
+-------------------
+
+* This build also supports compositors without `wl_shell` protocol support (like KWin) using `xdg-shell` protocol extension.
+* Make sure `wayland-protocols` package is installed (minimum 1.12 version is required).
+* Use general `cmake ../ -G Ninja` to build with `xdg-shell` support
+* In case of issues with `xdg-shell` use `cmake ../ -G Ninja -DWITH_XDG_SHELL=OFF` to build with `wl_shell` (old behavior)
+* Read the https://docs.google.com/document/d/1MX4JQM1adU6VHw-9oY9_YnHu27tqCrxbQfdZZeh2-D0/edit to build Flutter engine and substitute necessary engine files
+
 Build Setup Instructions
 ------------------------
 

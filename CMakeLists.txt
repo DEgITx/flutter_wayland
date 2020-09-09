@@ -6,6 +6,8 @@ cmake_minimum_required(VERSION 3.5.2)
 
 project(flutter_wayland)
 
+option(WITH_XDG_SHELL "Use xdg-shell protocol extension" ON)
+
 set(CMAKE_CXX_STANDARD 14)
 
 set(FLUTTER_ENGINE_SHA b9523318caa1a99ffde8adaf331212eb879cabc9)
@@ -39,6 +41,9 @@ if(NOT EXISTS ${FLUTTER_ARTIFACTS_ZIP})
   )
 endif()
 
+find_package(ECM REQUIRED)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${ECM_FIND_MODULE_DIR})
+
 find_package(PkgConfig)
 pkg_check_modules(WAYLAND_CLIENT REQUIRED wayland-client)
 pkg_check_modules(WAYLAND_EGL    REQUIRED wayland-egl)
@@ -49,6 +54,19 @@ file(GLOB_RECURSE FLUTTER_WAYLAND_SRC
   "src/*.cc"
   "src/*.h"
 )
+
+if(WITH_XDG_SHELL)
+  find_package(WaylandScanner REQUIRED)
+  pkg_check_modules(wayland-protocols REQUIRED wayland-protocols>=1.12)
+  execute_process(COMMAND pkg-config wayland-protocols --variable=pkgdatadir
+    OUTPUT_VARIABLE WAYLAND_PROTOCOLS_DIR
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  ecm_add_wayland_client_protocol(FLUTTER_WAYLAND_SRC
+      PROTOCOL ${WAYLAND_PROTOCOLS_DIR}/stable/xdg-shell/xdg-shell.xml
+      BASENAME xdg-shell
+  )
+  add_definitions(-DUSE_XDG_SHELL)
+endif()
 
 link_directories(${CMAKE_BINARY_DIR})
 
