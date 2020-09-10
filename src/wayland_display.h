@@ -9,12 +9,13 @@
 #include <wayland-egl.h>
 
 #ifdef USE_XDG_SHELL
-  #include "wayland-xdg-shell-client-protocol.h"
+#include "wayland-xdg-shell-client-protocol.h"
 #endif
 
 #include <memory>
 #include <string>
 
+#include "cify.h"
 #include "flutter_application.h"
 #include "macros.h"
 
@@ -38,6 +39,54 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate {
   static const struct xdg_surface_listener kXdgSurfaceListener;
   static const struct xdg_toplevel_listener kXdgToplevelListener;
 #endif
+  const wl_seat_listener kSeatListener = {
+      .capabilities = cify([self = this](void* data,
+                                         struct wl_seat* wl_seat,
+                                         uint32_t capabilities) -> void {
+        FLWAY_LOG << "self = " << self << std::endl;
+        self->SeatHandleCapabilities(data, wl_seat, capabilities);
+      }),
+  };
+  const wl_keyboard_listener kKeyboardListener = {
+      .keymap = cify([self = this](void* data,
+                                   struct wl_keyboard* wl_keyboard,
+                                   uint32_t format,
+                                   int32_t fd,
+                                   uint32_t size) {
+        self->KeyboardHandleKeymap(data, wl_keyboard, format, fd, size);
+      }),
+      .enter = cify([self = this](void* data,
+                                  struct wl_keyboard* wl_keyboard,
+                                  uint32_t serial,
+                                  struct wl_surface* surface,
+                                  struct wl_array* keys) {
+        self->KeyboardHandleEnter(data, wl_keyboard, serial, surface, keys);
+      }),
+      .leave = cify([self = this](void* data,
+                                  struct wl_keyboard* wl_keyboard,
+                                  uint32_t serial,
+                                  struct wl_surface* surface) {
+        self->KeyboardHandleLeave(data, wl_keyboard, serial, surface);
+      }),
+      .key = cify([self = this](void* data,
+                                struct wl_keyboard* wl_keyboard,
+                                uint32_t serial,
+                                uint32_t time,
+                                uint32_t key,
+                                uint32_t state) {
+        self->KeyboardHandleKey(data, wl_keyboard, serial, time, key, state);
+      }),
+      .modifiers = cify([self = this](void* data,
+                                      struct wl_keyboard* wl_keyboard,
+                                      uint32_t serial,
+                                      uint32_t mods_depressed,
+                                      uint32_t mods_latched,
+                                      uint32_t mods_locked,
+                                      uint32_t group) {
+        self->KeyboardHandleModifiers(data, wl_keyboard, serial, mods_depressed,
+                                      mods_latched, mods_locked, group);
+      }),
+  };
   bool valid_ = false;
   const int screen_width_;
   const int screen_height_;
@@ -48,6 +97,8 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate {
 #ifdef USE_XDG_SHELL
   xdg_wm_base* xdg_wm_base_ = nullptr;
 #endif
+  wl_seat* seat_ = nullptr;
+  wl_keyboard* keyboard_ = nullptr;
   wl_shell_surface* shell_surface_ = nullptr;
   wl_surface* surface_ = nullptr;
   wl_egl_window* window_ = nullptr;
@@ -56,20 +107,54 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate {
   EGLContext egl_context_ = EGL_NO_CONTEXT;
 
 #ifdef USE_XDG_SHELL
-  static void XdgWmBasePingHandler(void *data,
-                                  struct xdg_wm_base *xdg_wm_base,
-                                  uint32_t serial);
-  static void XdgSurfaceConfigureHandler(void *data,
-                                        struct xdg_surface *xdg_surface,
-                                        uint32_t serial);
-  static void XdgToplevelConfigureHandler(void *data,
-                                          struct xdg_toplevel *xdg_toplevel,
+  static void XdgWmBasePingHandler(void* data,
+                                   struct xdg_wm_base* xdg_wm_base,
+                                   uint32_t serial);
+  static void XdgSurfaceConfigureHandler(void* data,
+                                         struct xdg_surface* xdg_surface,
+                                         uint32_t serial);
+  static void XdgToplevelConfigureHandler(void* data,
+                                          struct xdg_toplevel* xdg_toplevel,
                                           int32_t width,
                                           int32_t height,
-                                          struct wl_array *states);
-  static void XdgToplevelCloseHandler(void *data,
-                                      struct xdg_toplevel *xdg_toplevel);
+                                          struct wl_array* states);
+  static void XdgToplevelCloseHandler(void* data,
+                                      struct xdg_toplevel* xdg_toplevel);
 #endif
+
+  void SeatHandleCapabilities(void* data, struct wl_seat* seat, uint32_t caps);
+
+  void KeyboardHandleKeymap(void* data,
+                            struct wl_keyboard* keyboard,
+                            uint32_t format,
+                            int fd,
+                            uint32_t size);
+
+  void KeyboardHandleEnter(void* data,
+                           struct wl_keyboard* keyboard,
+                           uint32_t serial,
+                           struct wl_surface* surface,
+                           struct wl_array* keys);
+
+  void KeyboardHandleLeave(void* data,
+                           struct wl_keyboard* keyboard,
+                           uint32_t serial,
+                           struct wl_surface* surface);
+
+  void KeyboardHandleKey(void* data,
+                         struct wl_keyboard* keyboard,
+                         uint32_t serial,
+                         uint32_t time,
+                         uint32_t key,
+                         uint32_t state);
+
+  void KeyboardHandleModifiers(void* data,
+                               struct wl_keyboard* keyboard,
+                               uint32_t serial,
+                               uint32_t mods_depressed,
+                               uint32_t mods_latched,
+                               uint32_t mods_locked,
+                               uint32_t group);
 
   bool SetupEGL();
 
