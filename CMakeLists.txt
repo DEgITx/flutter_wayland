@@ -4,6 +4,11 @@
 
 cmake_minimum_required(VERSION 3.5.2)
 
+include(DownloadProject.cmake)
+
+find_package(ECM REQUIRED)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${ECM_FIND_MODULE_DIR})
+
 project(flutter_wayland)
 
 option(WITH_XDG_SHELL "Use xdg-shell protocol extension" ON)
@@ -41,13 +46,17 @@ if(NOT EXISTS ${FLUTTER_ARTIFACTS_ZIP})
   )
 endif()
 
-find_package(ECM REQUIRED)
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${ECM_FIND_MODULE_DIR})
-
 find_package(PkgConfig)
 pkg_check_modules(WAYLAND_CLIENT REQUIRED wayland-client)
 pkg_check_modules(WAYLAND_EGL    REQUIRED wayland-egl)
 pkg_check_modules(EGL            REQUIRED egl)
+
+download_project(PROJ                fmt
+                 GIT_REPOSITORY      https://github.com/fmtlib/fmt.git
+                 GIT_TAG             7.0.3
+                 "UPDATE_DISCONNECTED 1"
+)
+add_subdirectory(${fmt_SOURCE_DIR} ${fmt_BINARY_DIR})
 
 # Executable
 file(GLOB_RECURSE FLUTTER_WAYLAND_SRC
@@ -73,6 +82,7 @@ link_directories(${CMAKE_BINARY_DIR})
 add_executable(flutter_wayland ${FLUTTER_WAYLAND_SRC})
 
 target_link_libraries(flutter_wayland
+  fmt::fmt
   ${WAYLAND_CLIENT_LIBRARIES}
   ${WAYLAND_EGL_LIBRARIES}
   ${EGL_LIBRARIES}
