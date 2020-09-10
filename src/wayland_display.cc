@@ -13,49 +13,110 @@
 
 #include <cstring>
 
+#include <fmt/format.h>
+
 namespace flutter {
 
 #define DISPLAY reinterpret_cast<WaylandDisplay*>(data)
 
 #ifdef USE_XDG_SHELL
 
-void WaylandDisplay::XdgToplevelConfigureHandler(void *data,
-                                                struct xdg_toplevel *xdg_toplevel,
-                                                int32_t width,
-                                                int32_t height,
-                                                struct wl_array *states) {
-}
+void WaylandDisplay::XdgToplevelConfigureHandler(
+    void* data,
+    struct xdg_toplevel* xdg_toplevel,
+    int32_t width,
+    int32_t height,
+    struct wl_array* states) {}
 
-void WaylandDisplay::XdgToplevelCloseHandler(void *data,
-                                            struct xdg_toplevel *xdg_toplevel) {
-}
+void WaylandDisplay::XdgToplevelCloseHandler(
+    void* data,
+    struct xdg_toplevel* xdg_toplevel) {}
 
 const xdg_toplevel_listener WaylandDisplay::kXdgToplevelListener = {
     .configure = XdgToplevelConfigureHandler,
-    .close = XdgToplevelCloseHandler
-};
+    .close = XdgToplevelCloseHandler};
 
-void WaylandDisplay::XdgSurfaceConfigureHandler(void *data,
-                                                struct xdg_surface *xdg_surface,
+void WaylandDisplay::XdgSurfaceConfigureHandler(void* data,
+                                                struct xdg_surface* xdg_surface,
                                                 uint32_t serial) {
-    xdg_surface_ack_configure(xdg_surface, serial);
+  xdg_surface_ack_configure(xdg_surface, serial);
 }
 
 const xdg_surface_listener WaylandDisplay::kXdgSurfaceListener = {
-    .configure = XdgSurfaceConfigureHandler
-};
+    .configure = XdgSurfaceConfigureHandler};
 
-void WaylandDisplay::XdgWmBasePingHandler(void *data,
-                                          struct xdg_wm_base *xdg_wm_base,
+void WaylandDisplay::XdgWmBasePingHandler(void* data,
+                                          struct xdg_wm_base* xdg_wm_base,
                                           uint32_t serial) {
-    xdg_wm_base_pong(xdg_wm_base, serial);
+  xdg_wm_base_pong(xdg_wm_base, serial);
 }
 
 const xdg_wm_base_listener WaylandDisplay::kXdgWmBaseListener = {
-    .ping = XdgWmBasePingHandler
-};
+    .ping = XdgWmBasePingHandler};
 
 #endif
+
+void WaylandDisplay::KeyboardHandleKeymap(void* data,
+                                          struct wl_keyboard* keyboard,
+                                          uint32_t format,
+                                          int fd,
+                                          uint32_t size) {}
+
+void WaylandDisplay::KeyboardHandleEnter(void* data,
+                                         struct wl_keyboard* keyboard,
+                                         uint32_t serial,
+                                         struct wl_surface* surface,
+                                         struct wl_array* keys) {
+  FLWAY_LOG << "Keyboard gained focus" << std::endl;
+}
+
+void WaylandDisplay::KeyboardHandleLeave(void* data,
+                                         struct wl_keyboard* keyboard,
+                                         uint32_t serial,
+                                         struct wl_surface* surface) {
+  FLWAY_LOG << "Keyboard lost focus" << std::endl;
+}
+
+void WaylandDisplay::KeyboardHandleKey(void* data,
+                                       struct wl_keyboard* keyboard,
+                                       uint32_t serial,
+                                       uint32_t time,
+                                       uint32_t key,
+                                       uint32_t state) {
+  FLWAY_LOG << fmt::format("Key is {} state is {}", key, state) << std::endl;
+}
+
+void WaylandDisplay::KeyboardHandleModifiers(void* data,
+                                             struct wl_keyboard* keyboard,
+                                             uint32_t serial,
+                                             uint32_t mods_depressed,
+                                             uint32_t mods_latched,
+                                             uint32_t mods_locked,
+                                             uint32_t group) {
+  FLWAY_LOG << fmt::format(
+                   "Modifiers depressed {}, latched {}, locked {}, group {}",
+                   mods_depressed, mods_latched, mods_locked, group)
+            << std::endl;
+}
+
+void WaylandDisplay::SeatHandleCapabilities(void* data,
+                                            struct wl_seat* seat,
+                                            uint32_t caps) {
+  if (caps & WL_SEAT_CAPABILITY_POINTER) {
+    FLWAY_LOG << "Display has a pointer" << std::endl;
+  }
+
+  if (caps & WL_SEAT_CAPABILITY_KEYBOARD) {
+    FLWAY_LOG << "Display has a keyboard" << std::endl;
+    keyboard_ = wl_seat_get_keyboard(seat);
+    FLWAY_LOG << "keyboard_ = " << keyboard_ << std::endl;
+    wl_keyboard_add_listener(keyboard_, &kKeyboardListener, NULL);
+  }
+
+  if (caps & WL_SEAT_CAPABILITY_TOUCH) {
+    FLWAY_LOG << "Display has a touch screen" << std::endl;
+  }
+}
 
 const wl_registry_listener WaylandDisplay::kRegistryListener = {
     .global = [](void* data,
@@ -126,6 +187,16 @@ WaylandDisplay::WaylandDisplay(size_t width, size_t height)
 }
 
 WaylandDisplay::~WaylandDisplay() {
+  if (keyboard_) {
+    wl_keyboard_destroy(keyboard_);
+    keyboard_ = nullptr;
+  }
+
+  if (seat_) {
+    wl_seat_destroy(seat_);
+    seat_ = nullptr;
+  }
+
   if (shell_surface_) {
     wl_shell_surface_destroy(shell_surface_);
     shell_surface_ = nullptr;
@@ -242,7 +313,8 @@ static void LogLastEGLError() {
 }
 
 bool WaylandDisplay::SetupEGL() {
-  FLWAY_LOG << "compositor_ = " << compositor_ << " shell_ = " << shell_ << std::endl;
+  FLWAY_LOG << "compositor_ = " << compositor_ << " shell_ = " << shell_
+            << std::endl;
 #ifdef USE_XDG_SHELL
   FLWAY_LOG << "xdg_wm_base_ = " << xdg_wm_base_ << std::endl;
 #endif
@@ -261,10 +333,11 @@ bool WaylandDisplay::SetupEGL() {
 
 #ifdef USE_XDG_SHELL
   xdg_wm_base_add_listener(xdg_wm_base_, &kXdgWmBaseListener, NULL);
-  struct xdg_surface *xdg_surface = xdg_wm_base_get_xdg_surface(xdg_wm_base_, surface_);
+  struct xdg_surface* xdg_surface =
+      xdg_wm_base_get_xdg_surface(xdg_wm_base_, surface_);
   xdg_surface_add_listener(xdg_surface, &kXdgSurfaceListener, NULL);
 
-  struct xdg_toplevel *xdg_toplevel = xdg_surface_get_toplevel(xdg_surface);
+  struct xdg_toplevel* xdg_toplevel = xdg_surface_get_toplevel(xdg_surface);
   xdg_toplevel_add_listener(xdg_toplevel, &kXdgToplevelListener, NULL);
   xdg_toplevel_set_title(xdg_toplevel, "Flutter");
 
@@ -286,7 +359,9 @@ bool WaylandDisplay::SetupEGL() {
     wl_shell_surface_set_title(shell_surface_, "Flutter");
     wl_shell_surface_set_toplevel(shell_surface_);
   } else {
-    FLWAY_ERROR << "Not using xdg-shell protocol extension and wl_shell is not available" << std::endl;
+    FLWAY_ERROR << "Not using xdg-shell protocol extension and wl_shell is not "
+                   "available"
+                << std::endl;
     return false;
   }
 #endif
@@ -407,6 +482,13 @@ void WaylandDisplay::AnnounceRegistryInterface(struct wl_registry* wl_registry,
     return;
   }
 #endif
+
+  if (strcmp(interface_name, "wl_seat") == 0) {
+    seat_ = static_cast<decltype(seat_)>(
+        wl_registry_bind(wl_registry, name, &wl_seat_interface, 1));
+    wl_seat_add_listener(seat_, &kSeatListener, NULL);
+    return;
+  }
 }
 
 void WaylandDisplay::UnannounceRegistryInterface(
