@@ -10,8 +10,9 @@ Zodiac Instructions
 
 * This build also supports compositors without `wl_shell` protocol support (like KWin) using `xdg-shell` protocol extension.
 * Make sure `wayland-protocols` package is installed (minimum 1.12 version is required).
-* Use general `cmake ../ -G Ninja` to build with `xdg-shell` support
-* In case of issues with `xdg-shell` use `cmake ../ -G Ninja -DWITH_XDG_SHELL=OFF` to build with `wl_shell` (old behavior)
+* Make sure `extra-cmake-modules` package is installed.
+* Use general `cmake ../ -G Ninja` to build without `xdg-shell` support
+* If you need `xdg-shell` support use `cmake ../ -G Ninja -DWITH_XDG_SHELL=ON` to build with `xdg-shell`
 
 Build Setup Instructions
 ------------------------
