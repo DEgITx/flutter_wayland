@@ -13,7 +13,7 @@
 
 #include <cstring>
 
-#include <fmt/format.h>
+#include "logger.h"
 
 namespace flutter {
 
@@ -67,14 +67,14 @@ void WaylandDisplay::KeyboardHandleEnter(void* data,
                                          uint32_t serial,
                                          struct wl_surface* surface,
                                          struct wl_array* keys) {
-  FLWAY_LOG << "Keyboard gained focus" << std::endl;
+  SPDLOG_DEBUG("Keyboard gained focus");
 }
 
 void WaylandDisplay::KeyboardHandleLeave(void* data,
                                          struct wl_keyboard* keyboard,
                                          uint32_t serial,
                                          struct wl_surface* surface) {
-  FLWAY_LOG << "Keyboard lost focus" << std::endl;
+  SPDLOG_DEBUG("Keyboard lost focus");
 }
 
 void WaylandDisplay::KeyboardHandleKey(void* data,
@@ -83,7 +83,8 @@ void WaylandDisplay::KeyboardHandleKey(void* data,
                                        uint32_t time,
                                        uint32_t key,
                                        uint32_t state) {
-  FLWAY_LOG << fmt::format("Key is {} state is {}", key, state) << std::endl;
+  SPDLOG_DEBUG("this = {}", fmt::ptr(this));
+  SPDLOG_DEBUG("Key is {} state is {}", key, state);
 }
 
 void WaylandDisplay::KeyboardHandleModifiers(void* data,
@@ -93,28 +94,26 @@ void WaylandDisplay::KeyboardHandleModifiers(void* data,
                                              uint32_t mods_latched,
                                              uint32_t mods_locked,
                                              uint32_t group) {
-  FLWAY_LOG << fmt::format(
-                   "Modifiers depressed {}, latched {}, locked {}, group {}",
-                   mods_depressed, mods_latched, mods_locked, group)
-            << std::endl;
+  SPDLOG_DEBUG("Modifiers depressed {}, latched {}, locked {}, group {}",
+               mods_depressed, mods_latched, mods_locked, group);
 }
 
 void WaylandDisplay::SeatHandleCapabilities(void* data,
                                             struct wl_seat* seat,
                                             uint32_t caps) {
   if (caps & WL_SEAT_CAPABILITY_POINTER) {
-    FLWAY_LOG << "Display has a pointer" << std::endl;
+    SPDLOG_INFO("Display has a pointer");
   }
 
   if (caps & WL_SEAT_CAPABILITY_KEYBOARD) {
-    FLWAY_LOG << "Display has a keyboard" << std::endl;
+    SPDLOG_INFO("Display has a keyboard");
     keyboard_ = wl_seat_get_keyboard(seat);
-    FLWAY_LOG << "keyboard_ = " << keyboard_ << std::endl;
+    SPDLOG_DEBUG("keyboard_ = {}", fmt::ptr(keyboard_));
     wl_keyboard_add_listener(keyboard_, &kKeyboardListener, NULL);
   }
 
   if (caps & WL_SEAT_CAPABILITY_TOUCH) {
-    FLWAY_LOG << "Display has a touch screen" << std::endl;
+    SPDLOG_INFO("Display has a touch screen");
   }
 }
 
@@ -145,7 +144,7 @@ const wl_shell_surface_listener WaylandDisplay::kShellSurfaceListener = {
                     uint32_t edges,
                     int32_t width,
                     int32_t height) -> void {
-      FLWAY_ERROR << "Unhandled resize." << std::endl;
+      SPDLOG_ERROR("Unhandled resize.");
     },
 
     .popup_done = [](void* data,
@@ -157,20 +156,20 @@ const wl_shell_surface_listener WaylandDisplay::kShellSurfaceListener = {
 WaylandDisplay::WaylandDisplay(size_t width, size_t height)
     : screen_width_(width), screen_height_(height) {
   if (screen_width_ == 0 || screen_height_ == 0) {
-    FLWAY_ERROR << "Invalid screen dimensions." << std::endl;
+    SPDLOG_ERROR("Invalid screen dimensions.");
     return;
   }
 
   display_ = wl_display_connect(nullptr);
 
   if (!display_) {
-    FLWAY_ERROR << "Could not connect to the wayland display." << std::endl;
+    SPDLOG_ERROR("Could not connect to the wayland display.");
     return;
   }
 
   registry_ = wl_display_get_registry(display_);
   if (!registry_) {
-    FLWAY_ERROR << "Could not get the wayland registry." << std::endl;
+    SPDLOG_ERROR("Could not get the wayland registry.");
     return;
   }
 
@@ -179,7 +178,7 @@ WaylandDisplay::WaylandDisplay(size_t width, size_t height)
   wl_display_roundtrip(display_);
 
   if (!SetupEGL()) {
-    FLWAY_ERROR << "Could not setup EGL." << std::endl;
+    SPDLOG_ERROR("Could not setup EGL.");
     return;
   }
 
@@ -257,7 +256,7 @@ bool WaylandDisplay::IsValid() const {
 
 bool WaylandDisplay::Run() {
   if (!valid_) {
-    FLWAY_ERROR << "Could not run an invalid display." << std::endl;
+    SPDLOG_ERROR("Could not run an invalid display.");
     return false;
   }
 
@@ -303,31 +302,29 @@ static void LogLastEGLError() {
 
   for (size_t i = 0; i < count; i++) {
     if (last_error == pairs[i].code) {
-      FLWAY_ERROR << "EGL Error: " << pairs[i].name << " (" << pairs[i].code
-                  << ")" << std::endl;
+      SPDLOG_ERROR("EGL Error: {} ({})", pairs[i].name, pairs[i].code);
       return;
     }
   }
 
-  FLWAY_ERROR << "Unknown EGL Error" << std::endl;
+  SPDLOG_ERROR("Unknown EGL Error");
 }
 
 bool WaylandDisplay::SetupEGL() {
-  FLWAY_LOG << "compositor_ = " << compositor_ << " shell_ = " << shell_
-            << std::endl;
+  SPDLOG_DEBUG("compositor_ = {} shell_ = {}", fmt::ptr(compositor_),
+               fmt::ptr(shell_));
 #ifdef USE_XDG_SHELL
-  FLWAY_LOG << "xdg_wm_base_ = " << xdg_wm_base_ << std::endl;
+  SPDLOG_DEBUG("xdg_wm_base_ = {}", fmt::ptr(xdg_wm_base_));
 #endif
   if (!compositor_) {
-    FLWAY_ERROR << "EGL setup needs missing compositor and shell connection."
-                << std::endl;
+    SPDLOG_ERROR("EGL setup needs missing compositor connection.");
     return false;
   }
 
   surface_ = wl_compositor_create_surface(compositor_);
 
   if (!surface_) {
-    FLWAY_ERROR << "Could not create compositor surface." << std::endl;
+    SPDLOG_ERROR("Could not create compositor surface.");
     return false;
   }
 
@@ -351,7 +348,7 @@ bool WaylandDisplay::SetupEGL() {
     shell_surface_ = wl_shell_get_shell_surface(shell_, surface_);
 
     if (!shell_surface_) {
-      FLWAY_ERROR << "Could not shell surface." << std::endl;
+      SPDLOG_ERROR("Could not shell surface.");
       return false;
     }
 
@@ -359,9 +356,9 @@ bool WaylandDisplay::SetupEGL() {
     wl_shell_surface_set_title(shell_surface_, "Flutter");
     wl_shell_surface_set_toplevel(shell_surface_);
   } else {
-    FLWAY_ERROR << "Not using xdg-shell protocol extension and wl_shell is not "
-                   "available"
-                << std::endl;
+    SPDLOG_ERROR(
+        "Not using xdg-shell protocol extension and wl_shell is not "
+        "available");
     return false;
   }
 #endif
@@ -369,26 +366,26 @@ bool WaylandDisplay::SetupEGL() {
   window_ = wl_egl_window_create(surface_, screen_width_, screen_height_);
 
   if (!window_) {
-    FLWAY_ERROR << "Could not create EGL window." << std::endl;
+    SPDLOG_ERROR("Could not create EGL window.");
     return false;
   }
 
   if (eglBindAPI(EGL_OPENGL_ES_API) != EGL_TRUE) {
     LogLastEGLError();
-    FLWAY_ERROR << "Could not bind the ES API." << std::endl;
+    SPDLOG_ERROR("Could not bind the ES API.");
     return false;
   }
 
   egl_display_ = eglGetDisplay(display_);
   if (egl_display_ == EGL_NO_DISPLAY) {
     LogLastEGLError();
-    FLWAY_ERROR << "Could not access EGL display." << std::endl;
+    SPDLOG_ERROR("Could not access EGL display.");
     return false;
   }
 
   if (eglInitialize(egl_display_, nullptr, nullptr) != EGL_TRUE) {
     LogLastEGLError();
-    FLWAY_ERROR << "Could not initialize EGL display." << std::endl;
+    SPDLOG_ERROR("Could not initialize EGL display.");
     return false;
   }
 
@@ -415,14 +412,13 @@ bool WaylandDisplay::SetupEGL() {
     if (eglChooseConfig(egl_display_, attribs, &egl_config, 1, &config_count) !=
         EGL_TRUE) {
       LogLastEGLError();
-      FLWAY_ERROR << "Error when attempting to choose an EGL surface config."
-                  << std::endl;
+      SPDLOG_ERROR("Error when attempting to choose an EGL surface config.");
       return false;
     }
 
     if (config_count == 0 || egl_config == nullptr) {
       LogLastEGLError();
-      FLWAY_ERROR << "No matching configs." << std::endl;
+      SPDLOG_ERROR("No matching configs.");
       return false;
     }
   }
@@ -436,8 +432,7 @@ bool WaylandDisplay::SetupEGL() {
 
     if (surface_ == EGL_NO_SURFACE) {
       LogLastEGLError();
-      FLWAY_ERROR << "EGL surface was null during surface selection."
-                  << std::endl;
+      SPDLOG_ERROR("EGL surface was null during surface selection.");
       return false;
     }
   }
@@ -451,7 +446,7 @@ bool WaylandDisplay::SetupEGL() {
 
     if (egl_context_ == EGL_NO_CONTEXT) {
       LogLastEGLError();
-      FLWAY_ERROR << "Could not create an onscreen context." << std::endl;
+      SPDLOG_ERROR("Could not create an onscreen context.");
       return false;
     }
   }
@@ -498,14 +493,14 @@ void WaylandDisplay::UnannounceRegistryInterface(
 // |flutter::FlutterApplication::RenderDelegate|
 bool WaylandDisplay::OnApplicationContextMakeCurrent() {
   if (!valid_) {
-    FLWAY_ERROR << "Invalid display." << std::endl;
+    SPDLOG_ERROR("Invalid display.");
     return false;
   }
 
   if (eglMakeCurrent(egl_display_, egl_surface_, egl_surface_, egl_context_) !=
       EGL_TRUE) {
     LogLastEGLError();
-    FLWAY_ERROR << "Could not make the onscreen context current" << std::endl;
+    SPDLOG_ERROR("Could not make the onscreen context current");
     return false;
   }
 
@@ -515,14 +510,14 @@ bool WaylandDisplay::OnApplicationContextMakeCurrent() {
 // |flutter::FlutterApplication::RenderDelegate|
 bool WaylandDisplay::OnApplicationContextClearCurrent() {
   if (!valid_) {
-    FLWAY_ERROR << "Invalid display." << std::endl;
+    SPDLOG_ERROR("Invalid display.");
     return false;
   }
 
   if (eglMakeCurrent(egl_display_, EGL_NO_SURFACE, EGL_NO_SURFACE,
                      EGL_NO_CONTEXT) != EGL_TRUE) {
     LogLastEGLError();
-    FLWAY_ERROR << "Could not clear the context." << std::endl;
+    SPDLOG_ERROR("Could not clear the context.");
     return false;
   }
 
@@ -532,13 +527,13 @@ bool WaylandDisplay::OnApplicationContextClearCurrent() {
 // |flutter::FlutterApplication::RenderDelegate|
 bool WaylandDisplay::OnApplicationPresent() {
   if (!valid_) {
-    FLWAY_ERROR << "Invalid display." << std::endl;
+    SPDLOG_ERROR("Invalid display.");
     return false;
   }
 
   if (eglSwapBuffers(egl_display_, egl_surface_) != EGL_TRUE) {
     LogLastEGLError();
-    FLWAY_ERROR << "Could not swap the EGL buffer." << std::endl;
+    SPDLOG_ERROR("Could not swap the EGL buffer.");
     return false;
   }
 
@@ -548,7 +543,7 @@ bool WaylandDisplay::OnApplicationPresent() {
 // |flutter::FlutterApplication::RenderDelegate|
 uint32_t WaylandDisplay::OnApplicationGetOnscreenFBO() {
   if (!valid_) {
-    FLWAY_ERROR << "Invalid display." << std::endl;
+    SPDLOG_ERROR("Invalid display.");
     return 999;
   }
 
