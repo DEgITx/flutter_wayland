@@ -41,8 +41,11 @@ static std::string GetICUDataPath() {
 FlutterApplication::FlutterApplication(
     std::string bundle_path,
     const std::vector<std::string>& command_line_args,
-    RenderDelegate& render_delegate)
-    : render_delegate_(render_delegate) {
+    RenderDelegate& render_delegate,
+    EventEmitter& event_emitter)
+    : render_delegate_(render_delegate),
+      event_emitter_(event_emitter),
+      display_event_listener_(this) {
   if (!FlutterAssetBundleIsValid(bundle_path)) {
     SPDLOG_ERROR("Flutter asset bundle was not valid.");
     return;
@@ -99,7 +102,6 @@ FlutterApplication::FlutterApplication(
   args.command_line_argc = static_cast<int>(command_line_args_c.size());
   args.command_line_argv = command_line_args_c.data();
 
-  FlutterEngine engine = nullptr;
   auto result = FlutterEngineRun(FLUTTER_ENGINE_VERSION, &config, &args,
                                  this /* userdata */, &engine_);
 
@@ -108,10 +110,14 @@ FlutterApplication::FlutterApplication(
     return;
   }
 
+  event_emitter_.addListener(&display_event_listener_);
+
   valid_ = true;
 }
 
 FlutterApplication::~FlutterApplication() {
+  event_emitter_.removeListener(&display_event_listener_);
+
   if (engine_ == nullptr) {
     return;
   }
@@ -178,6 +184,47 @@ bool FlutterApplication::SendFlutterPointerEvent(FlutterPointerPhase phase,
           std::chrono::high_resolution_clock::now().time_since_epoch())
           .count();
   return FlutterEngineSendPointerEvent(engine_, &event, 1) == kSuccess;
+}
+
+bool FlutterApplication::SendPlatformMessage(const char* channel,
+                                             const uint8_t* message,
+                                             const size_t message_size) {
+  FlutterPlatformMessageResponseHandle* response_handle = nullptr;
+
+  FlutterPlatformMessage platform_message = {
+      sizeof(FlutterPlatformMessage),
+      .channel = channel,
+      .message = message,
+      .message_size = message_size,
+      .response_handle = response_handle,
+  };
+
+  FlutterEngineResult message_result =
+      FlutterEngineSendPlatformMessage(engine_, &platform_message);
+
+  if (response_handle != nullptr) {
+    FlutterPlatformMessageReleaseResponseHandle(engine_, response_handle);
+  }
+
+  return message_result == kSuccess;
+}
+
+void FlutterApplication::OnKeyboardKey(uint32_t scanCode, bool pressed) {
+  kKeyEventMessage["keyCode"] = toGLFWKeyCode(scanCode);
+  kKeyEventMessage["scanCode"] = scanCode;
+  kKeyEventMessage["type"] = pressed ? "keydown" : "keyup";
+
+  std::string s = kKeyEventMessage.dump();
+
+  SPDLOG_TRACE("Sending PlatformMessage: {}", s);
+
+  bool success = SendPlatformMessage(
+      "flutter/keyevent", reinterpret_cast<const uint8_t*>(s.c_str()),
+      s.size());
+
+  if (!success) {
+    SPDLOG_ERROR("Error sending PlatformMessage: {}", s);
+  }
 }
 
 }  // namespace flutter

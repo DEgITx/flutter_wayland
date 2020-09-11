@@ -9,6 +9,10 @@
 #include <functional>
 #include <vector>
 
+#include <nlohmann/json.hpp>
+
+#include "keys.h"
+#include "logger.h"
 #include "macros.h"
 
 namespace flutter {
@@ -25,10 +29,26 @@ class FlutterApplication {
 
     virtual uint32_t OnApplicationGetOnscreenFBO() = 0;
   };
+  class EventListener {
+   public:
+    virtual void OnKeyboardKey(uint32_t scanCode, bool pressed) = 0;
+  };
+  class EventEmitter {
+   protected:
+    std::vector<EventListener*> kEventListeners;
+
+   public:
+    void addListener(EventListener* l) { kEventListeners.push_back(l); }
+
+    void removeListener(EventListener* l) {
+      std::remove(kEventListeners.begin(), kEventListeners.end(), l);
+    }
+  };
 
   FlutterApplication(std::string bundle_path,
                      const std::vector<std::string>& args,
-                     RenderDelegate& render_delegate);
+                     RenderDelegate& render_delegate,
+                     EventEmitter& event_emitter);
 
   ~FlutterApplication();
 
@@ -41,12 +61,39 @@ class FlutterApplication {
   bool SendPointerEvent(int button, int x, int y);
 
  private:
+  class DisplayEventListener : public EventListener {
+    FlutterApplication* parent;
+
+   public:
+    DisplayEventListener(FlutterApplication* p) { parent = p; }
+
+    void OnKeyboardKey(uint32_t scanCode, bool pressed) {
+      SPDLOG_DEBUG("scanCode = {} pressed = {}", scanCode, pressed);
+      parent->OnKeyboardKey(scanCode, pressed);
+    }
+  } display_event_listener_;
+
+  nlohmann::json kKeyEventMessage = {
+    {"keyCode", 0},
+    {"keymap", "linux"},
+    {"scanCode", 0},
+    {"modifiers", 0},
+    {"toolkit", "glfw"},
+    {"type", ""}
+  };
+
   bool valid_;
   RenderDelegate& render_delegate_;
+  EventEmitter& event_emitter_;
   FlutterEngine engine_ = nullptr;
   int last_button_ = 0;
 
+  void OnKeyboardKey(uint32_t scanCode, bool pressed);
+
   bool SendFlutterPointerEvent(FlutterPointerPhase phase, double x, double y);
+  bool SendPlatformMessage(const char* channel,
+                           const uint8_t* message,
+                           const size_t message_size);
 
   FLWAY_DISALLOW_COPY_AND_ASSIGN(FlutterApplication);
 };
