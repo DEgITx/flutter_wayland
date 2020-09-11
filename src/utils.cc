@@ -8,6 +8,8 @@
 
 #include <sstream>
 
+#include "logger.h"
+
 namespace flutter {
 
 static std::string GetExecutablePath() {
@@ -48,12 +50,12 @@ bool FileExistsAtPath(const std::string& path) {
 
 bool FlutterAssetBundleIsValid(const std::string& bundle_path) {
   if (!FileExistsAtPath(bundle_path)) {
-    FLWAY_ERROR << "Bundle directory does not exist." << std::endl;
+    SPDLOG_ERROR("Bundle directory does not exist.");
     return false;
   }
 
   if (!FileExistsAtPath(bundle_path + std::string{"/kernel_blob.bin"})) {
-    FLWAY_ERROR << "Kernel blob does not exist." << std::endl;
+    SPDLOG_ERROR("Kernel blob does not exist.");
     return false;
   }
 

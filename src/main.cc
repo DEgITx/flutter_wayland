@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "flutter_application.h"
+#include "logger.h"
 #include "utils.h"
 #include "wayland_display.h"
 
@@ -59,24 +60,24 @@ static bool Main(std::vector<std::string> args) {
   const size_t kHeight = 600;
 
   for (const auto& arg : args) {
-    FLWAY_ERROR << "Arg: " << arg << std::endl;
+    SPDLOG_DEBUG("Arg: {}", arg);
   }
 
   WaylandDisplay display(kWidth, kHeight);
 
   if (!display.IsValid()) {
-    FLWAY_ERROR << "Wayland display was not valid." << std::endl;
+    SPDLOG_ERROR("Wayland display was not valid.");
     return false;
   }
 
   FlutterApplication application(asset_bundle_path, args, display);
   if (!application.IsValid()) {
-    FLWAY_ERROR << "Flutter application was not valid." << std::endl;
+    SPDLOG_ERROR("Flutter application was not valid.");
     return false;
   }
 
   if (!application.SetWindowSize(kWidth, kHeight)) {
-    FLWAY_ERROR << "Could not update Flutter application size." << std::endl;
+    SPDLOG_ERROR("Could not update Flutter application size.");
     return false;
   }
 
@@ -88,6 +89,11 @@ static bool Main(std::vector<std::string> args) {
 }  // namespace flutter
 
 int main(int argc, char* argv[]) {
+  auto console = spdlog::stdout_color_mt("console");
+  spdlog::set_level(spdlog::level::trace);
+  spdlog::set_default_logger(console);
+  spdlog::set_pattern("[%H:%M:%S.%e] [%^%L%$] %g:%#: %v");
+
   std::vector<std::string> args;
   for (int i = 1; i < argc; ++i) {
     args.push_back(argv[i]);

@@ -11,6 +11,7 @@
 #include <sstream>
 #include <vector>
 
+#include "logger.h"
 #include "utils.h"
 
 namespace flutter {
@@ -30,7 +31,7 @@ static std::string GetICUDataPath() {
   auto icu_path = stream.str();
 
   if (!FileExistsAtPath(icu_path.c_str())) {
-    FLWAY_ERROR << "Could not find " << icu_path << std::endl;
+    SPDLOG_ERROR("Could not find {}", icu_path);
     return "";
   }
 
@@ -43,7 +44,7 @@ FlutterApplication::FlutterApplication(
     RenderDelegate& render_delegate)
     : render_delegate_(render_delegate) {
   if (!FlutterAssetBundleIsValid(bundle_path)) {
-    FLWAY_ERROR << "Flutter asset bundle was not valid." << std::endl;
+    SPDLOG_ERROR("Flutter asset bundle was not valid.");
     return;
   }
 
@@ -72,16 +73,16 @@ FlutterApplication::FlutterApplication(
     if (address != nullptr) {
       return reinterpret_cast<void*>(address);
     }
-    FLWAY_ERROR << "Tried unsuccessfully to resolve: " << name << std::endl;
+    SPDLOG_ERROR("Tried unsuccessfully to resolve: {}", name);
     return nullptr;
   };
 
   auto icu_data_path = GetICUDataPath();
 
   if (icu_data_path == "") {
-    FLWAY_ERROR << "Could not find ICU data. It should be placed next to the "
-                   "executable but it wasn't there."
-                << std::endl;
+    SPDLOG_ERROR(
+        "Could not find ICU data. It should be placed next to the "
+        "executable but it wasn't there.");
     return;
   }
 
@@ -103,7 +104,7 @@ FlutterApplication::FlutterApplication(
                                  this /* userdata */, &engine_);
 
   if (result != kSuccess) {
-    FLWAY_ERROR << "Could not run the Flutter engine" << std::endl;
+    SPDLOG_ERROR("Could not run the Flutter engine");
     return;
   }
 
@@ -118,7 +119,7 @@ FlutterApplication::~FlutterApplication() {
   auto result = FlutterEngineShutdown(engine_);
 
   if (result != kSuccess) {
-    FLWAY_ERROR << "Could not shutdown the Flutter engine." << std::endl;
+    SPDLOG_ERROR("Could not shutdown the Flutter engine.");
   }
 }
 
@@ -141,7 +142,7 @@ void FlutterApplication::ProcessEvents() {
 
 bool FlutterApplication::SendPointerEvent(int button, int x, int y) {
   if (!valid_) {
-    FLWAY_ERROR << "Pointer events on an invalid application." << std::endl;
+    SPDLOG_ERROR("Pointer events on an invalid application.");
     return false;
   }
 
