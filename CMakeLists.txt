@@ -4,7 +4,7 @@
 
 cmake_minimum_required(VERSION 3.5.2)
 
-include(DownloadProject.cmake)
+include(FetchContent)
 
 project(flutter_wayland)
 
@@ -47,22 +47,42 @@ find_package(PkgConfig)
 pkg_check_modules(WAYLAND_CLIENT REQUIRED wayland-client)
 pkg_check_modules(WAYLAND_EGL    REQUIRED wayland-egl)
 pkg_check_modules(EGL            REQUIRED egl)
+pkg_check_modules(GLFW           REQUIRED glfw3)
 
-download_project(PROJ                fmt
-                 GIT_REPOSITORY      https://github.com/fmtlib/fmt.git
-                 GIT_TAG             7.0.3
-                 UPDATE_DISCONNECTED 1
+FetchContent_Declare(
+  fmt
+  GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+  GIT_TAG 7.0.3
 )
-add_subdirectory(${fmt_SOURCE_DIR} ${fmt_BINARY_DIR})
+FetchContent_GetProperties(fmt)
+if(NOT fmt_POPULATED)
+  FetchContent_Populate(fmt)
+  add_subdirectory(${fmt_SOURCE_DIR} ${fmt_BINARY_DIR} EXCLUDE_FROM_ALL)
+endif()
 
-download_project(PROJ                spdlog
-                 GIT_REPOSITORY      https://github.com/gabime/spdlog.git
-                 GIT_TAG             v1.8.0
-                 UPDATE_DISCONNECTED 1
+FetchContent_Declare(
+  spdlog
+  GIT_REPOSITORY https://github.com/gabime/spdlog.git
+  GIT_TAG v1.8.0
 )
-option(SPDLOG_FMT_EXTERNAL "Use external fmt library instead of bundled" OFF)
-set(SPDLOG_FMT_EXTERNAL ON) # Using external fmt library added above (bundled version can be outdated)
-add_subdirectory(${spdlog_SOURCE_DIR} ${spdlog_BINARY_DIR})
+FetchContent_GetProperties(spdlog)
+if(NOT spdlog_POPULATED)
+  FetchContent_Populate(spdlog)
+  option(SPDLOG_FMT_EXTERNAL "Use external fmt library instead of bundled" OFF)
+  set(SPDLOG_FMT_EXTERNAL ON) # Using external fmt library added above (bundled version can be outdated)
+  add_subdirectory(${spdlog_SOURCE_DIR} ${spdlog_BINARY_DIR} EXCLUDE_FROM_ALL)
+endif()
+
+FetchContent_Declare(
+  nlohmann_json
+  GIT_REPOSITORY https://github.com/ArthurSonzogni/nlohmann_json_cmake_fetchcontent
+  GIT_TAG v3.9.1
+)
+FetchContent_GetProperties(nlohmann_json)
+if(NOT nlohmann_json_POPULATED)
+  FetchContent_Populate(nlohmann_json)
+  add_subdirectory(${nlohmann_json_SOURCE_DIR} ${nlohmann_json_BINARY_DIR} EXCLUDE_FROM_ALL)
+endif()
 
 # Executable
 file(GLOB_RECURSE FLUTTER_WAYLAND_SRC
@@ -95,6 +115,7 @@ add_executable(flutter_wayland ${FLUTTER_WAYLAND_SRC})
 
 target_link_libraries(flutter_wayland
   spdlog::spdlog
+  nlohmann_json::nlohmann_json
   ${WAYLAND_CLIENT_LIBRARIES}
   ${WAYLAND_EGL_LIBRARIES}
   ${EGL_LIBRARIES}
@@ -106,5 +127,6 @@ target_include_directories(flutter_wayland
   ${WAYLAND_CLIENT_INCLUDE_DIRS}
   ${WAYLAND_EGL_INCLUDE_DIRS}
   ${EGL_INCLUDE_DIRS}
+  ${GLFW_INCLUDE_DIRS}
   ${CMAKE_BINARY_DIR}
 )

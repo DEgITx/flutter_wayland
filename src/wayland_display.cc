@@ -83,8 +83,11 @@ void WaylandDisplay::KeyboardHandleKey(void* data,
                                        uint32_t time,
                                        uint32_t key,
                                        uint32_t state) {
-  SPDLOG_DEBUG("this = {}", fmt::ptr(this));
-  SPDLOG_DEBUG("Key is {} state is {}", key, state);
+  SPDLOG_DEBUG("key = {} state = {}", key, state);
+  for (auto listener = kEventListeners.begin();
+       listener != kEventListeners.end(); ++listener) {
+    (*listener)->OnKeyboardKey(key, state);
+  }
 }
 
 void WaylandDisplay::KeyboardHandleModifiers(void* data,

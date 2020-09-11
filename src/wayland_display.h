@@ -13,6 +13,7 @@
 #endif
 
 #include <memory>
+#include <set>
 #include <string>
 
 #include "cify.h"
@@ -21,7 +22,8 @@
 
 namespace flutter {
 
-class WaylandDisplay : public FlutterApplication::RenderDelegate {
+class WaylandDisplay : public FlutterApplication::RenderDelegate,
+                       public FlutterApplication::EventEmitter {
  public:
   WaylandDisplay(size_t width, size_t height);
 
