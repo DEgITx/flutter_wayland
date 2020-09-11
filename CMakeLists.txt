@@ -2,9 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.5.2)
 
-include(FetchContent)
+include(DownloadProject/DownloadProject.cmake)
 
 project(flutter_wayland)
 
@@ -18,29 +18,28 @@ pkg_check_modules(WAYLAND_EGL    REQUIRED wayland-egl)
 pkg_check_modules(EGL            REQUIRED egl)
 pkg_check_modules(GLFW           REQUIRED glfw3)
 
-set(FETCHCONTENT_QUIET OFF)
-FetchContent_Declare(
-  fmt
-  GIT_REPOSITORY https://github.com/fmtlib/fmt.git
-  GIT_TAG 7.0.3
+download_project(PROJ                fmt
+                 GIT_REPOSITORY      https://github.com/fmtlib/fmt.git
+                 GIT_TAG             7.0.3
+                 UPDATE_DISCONNECTED 1
 )
-FetchContent_MakeAvailable(fmt)
+add_subdirectory(${fmt_SOURCE_DIR} ${fmt_BINARY_DIR})
 
-FetchContent_Declare(
-  spdlog
-  GIT_REPOSITORY https://github.com/gabime/spdlog.git
-  GIT_TAG v1.8.0
+download_project(PROJ                spdlog
+                 GIT_REPOSITORY      https://github.com/gabime/spdlog.git
+                 GIT_TAG             v1.8.0
+                 UPDATE_DISCONNECTED 1
 )
 option(SPDLOG_FMT_EXTERNAL "Use external fmt library instead of bundled" OFF)
 set(SPDLOG_FMT_EXTERNAL ON) # Using external fmt library added above (bundled version can be outdated)
-FetchContent_MakeAvailable(spdlog)
+add_subdirectory(${spdlog_SOURCE_DIR} ${spdlog_BINARY_DIR})
 
-FetchContent_Declare(
-  nlohmann_json
-  GIT_REPOSITORY https://github.com/ArthurSonzogni/nlohmann_json_cmake_fetchcontent
-  GIT_TAG v3.9.1
+download_project(PROJ                nlohmann_json
+                 GIT_REPOSITORY      https://github.com/ArthurSonzogni/nlohmann_json_cmake_fetchcontent
+                 GIT_TAG             v3.9.1
+                 UPDATE_DISCONNECTED 1
 )
-FetchContent_MakeAvailable(nlohmann_json)
+add_subdirectory(${nlohmann_json_SOURCE_DIR} ${nlohmann_json_BINARY_DIR})
 
 # Executable
 file(GLOB_RECURSE FLUTTER_WAYLAND_SRC
