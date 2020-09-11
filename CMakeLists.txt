@@ -51,9 +51,18 @@ pkg_check_modules(EGL            REQUIRED egl)
 download_project(PROJ                fmt
                  GIT_REPOSITORY      https://github.com/fmtlib/fmt.git
                  GIT_TAG             7.0.3
-                 "UPDATE_DISCONNECTED 1"
+                 UPDATE_DISCONNECTED 1
 )
 add_subdirectory(${fmt_SOURCE_DIR} ${fmt_BINARY_DIR})
+
+download_project(PROJ                spdlog
+                 GIT_REPOSITORY      https://github.com/gabime/spdlog.git
+                 GIT_TAG             v1.8.0
+                 UPDATE_DISCONNECTED 1
+)
+option(SPDLOG_FMT_EXTERNAL "Use external fmt library instead of bundled" OFF)
+set(SPDLOG_FMT_EXTERNAL ON) # Using external fmt library added above (bundled version can be outdated)
+add_subdirectory(${spdlog_SOURCE_DIR} ${spdlog_BINARY_DIR})
 
 # Executable
 file(GLOB_RECURSE FLUTTER_WAYLAND_SRC
@@ -85,7 +94,7 @@ link_directories(${CMAKE_BINARY_DIR})
 add_executable(flutter_wayland ${FLUTTER_WAYLAND_SRC})
 
 target_link_libraries(flutter_wayland
-  fmt::fmt
+  spdlog::spdlog
   ${WAYLAND_CLIENT_LIBRARIES}
   ${WAYLAND_EGL_LIBRARIES}
   ${EGL_LIBRARIES}

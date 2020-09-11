@@ -43,7 +43,6 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate {
       .capabilities = cify([self = this](void* data,
                                          struct wl_seat* wl_seat,
                                          uint32_t capabilities) -> void {
-        FLWAY_LOG << "self = " << self << std::endl;
         self->SeatHandleCapabilities(data, wl_seat, capabilities);
       }),
   };
