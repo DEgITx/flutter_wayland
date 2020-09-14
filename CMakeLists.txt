@@ -66,6 +66,17 @@ if(WITH_XDG_SHELL)
   add_definitions(-DUSE_XDG_SHELL)
 endif()
 
+set(FLUTTER_PATH "" CACHE STRING "Flutter Engine path")
+if(NOT FLUTTER_PATH STREQUAL "")
+  find_library(FLUTTER_LIBRARY NAMES flutter_engine HINTS ${FLUTTER_PATH})
+  find_path(FLUTTER_INCLUDE_DIR flutter_embedder.h HINTS ${FLUTTER_PATH})
+  file(COPY ${FLUTTER_INCLUDE_DIR}/icudtl.dat
+        DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+else()
+  set(FLUTTER_LIBRARY "flutter_engine")
+  set(FLUTTER_INCLUDE_DIR "")
+endif()
+
 link_directories(${CMAKE_BINARY_DIR})
 
 add_executable(flutter_wayland ${FLUTTER_WAYLAND_SRC})
@@ -76,7 +87,7 @@ target_link_libraries(flutter_wayland
   ${WAYLAND_CLIENT_LIBRARIES}
   ${WAYLAND_EGL_LIBRARIES}
   ${EGL_LIBRARIES}
-  flutter_engine
+  ${FLUTTER_LIBRARY}
 )
 
 target_include_directories(flutter_wayland
@@ -86,4 +97,5 @@ target_include_directories(flutter_wayland
   ${EGL_INCLUDE_DIRS}
   ${GLFW_INCLUDE_DIRS}
   ${CMAKE_BINARY_DIR}
+  ${FLUTTER_INCLUDE_DIR}
 )
