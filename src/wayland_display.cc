@@ -9,6 +9,7 @@
 #include "wayland_display.h"
 
 #include <stdlib.h>
+#include <sys/mman.h>
 #include <unistd.h>
 
 #include <cstring>
@@ -60,7 +61,21 @@ void WaylandDisplay::KeyboardHandleKeymap(void* data,
                                           struct wl_keyboard* keyboard,
                                           uint32_t format,
                                           int fd,
-                                          uint32_t size) {}
+                                          uint32_t size) {
+  SPDLOG_DEBUG("format = {} fd = {} size = {}", format, fd, size);
+
+  keymap_format_ = static_cast<wl_keyboard_keymap_format>(format);
+  char* const keymap_string = reinterpret_cast<char* const>(
+      mmap(nullptr, size, PROT_READ, MAP_PRIVATE, fd, 0));
+  xkb_keymap_unref(xkb_keymap_);
+  xkb_keymap_ = xkb_keymap_new_from_string(xkb_context_, keymap_string,
+                                           XKB_KEYMAP_FORMAT_TEXT_V1,
+                                           XKB_KEYMAP_COMPILE_NO_FLAGS);
+  munmap(keymap_string, size);
+  close(fd);
+  xkb_state_unref(xkb_state_);
+  xkb_state_ = xkb_state_new(xkb_keymap_);
+}
 
 void WaylandDisplay::KeyboardHandleEnter(void* data,
                                          struct wl_keyboard* keyboard,
@@ -83,10 +98,25 @@ void WaylandDisplay::KeyboardHandleKey(void* data,
                                        uint32_t time,
                                        uint32_t key,
                                        uint32_t state) {
-  SPDLOG_DEBUG("key = {} state = {}", key, state);
+  SPDLOG_DEBUG("key = {} state = {} keymap_format_ = {}", key, state,
+               keymap_format_);
+
+  std::string action =
+      state == WL_KEYBOARD_KEY_STATE_PRESSED ? "pressed" : "released";
+
+  uint32_t mappedKey = key + (keymap_format_ * 8);
+
+  xkb_keysym_t keysym = xkb_state_key_get_one_sym(xkb_state_, mappedKey);
+  uint32_t utf32 = xkb_state_key_get_utf32(xkb_state_, mappedKey);
+  char name[64];
+  xkb_keysym_get_name(keysym, name, sizeof(name));
+
+  SPDLOG_DEBUG("keysym = {} utf32 = U+{}", keysym, utf32);
+  SPDLOG_DEBUG("The key '{}' was {}", name, action);
+
   for (auto listener = kEventListeners.begin();
        listener != kEventListeners.end(); ++listener) {
-    (*listener)->OnKeyboardKey(key, state);
+    (*listener)->OnKeyboardKey(key, mappedKey, utf32, state);
   }
 }
 
@@ -97,8 +127,11 @@ void WaylandDisplay::KeyboardHandleModifiers(void* data,
                                              uint32_t mods_latched,
                                              uint32_t mods_locked,
                                              uint32_t group) {
-  SPDLOG_DEBUG("Modifiers depressed {}, latched {}, locked {}, group {}",
+  SPDLOG_DEBUG("Modifiers depressed = {} latched = {} locked = {} group = {}",
                mods_depressed, mods_latched, mods_locked, group);
+
+  xkb_state_update_mask(xkb_state_, mods_depressed, mods_latched, mods_locked,
+                        0, 0, group);
 }
 
 void WaylandDisplay::SeatHandleCapabilities(void* data,
@@ -157,7 +190,9 @@ const wl_shell_surface_listener WaylandDisplay::kShellSurfaceListener = {
 };
 
 WaylandDisplay::WaylandDisplay(size_t width, size_t height)
-    : screen_width_(width), screen_height_(height) {
+    : screen_width_(width),
+      screen_height_(height),
+      xkb_context_(xkb_context_new(XKB_CONTEXT_NO_FLAGS)) {
   if (screen_width_ == 0 || screen_height_ == 0) {
     SPDLOG_ERROR("Invalid screen dimensions.");
     return;
@@ -189,6 +224,15 @@ WaylandDisplay::WaylandDisplay(size_t width, size_t height)
 }
 
 WaylandDisplay::~WaylandDisplay() {
+  xkb_keymap_unref(xkb_keymap_);
+  xkb_keymap_ = nullptr;
+
+  xkb_state_unref(xkb_state_);
+  xkb_state_ = nullptr;
+
+  xkb_context_unref(xkb_context_);
+  xkb_context_ = nullptr;
+
   if (keyboard_) {
     wl_keyboard_destroy(keyboard_);
     keyboard_ = nullptr;
