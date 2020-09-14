@@ -7,6 +7,7 @@
 #include <EGL/egl.h>
 #include <wayland-client.h>
 #include <wayland-egl.h>
+#include <xkbcommon/xkbcommon.h>
 
 #ifdef USE_XDG_SHELL
 #include "wayland-xdg-shell-client-protocol.h"
@@ -106,6 +107,12 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate,
   EGLDisplay egl_display_ = EGL_NO_DISPLAY;
   EGLSurface egl_surface_ = nullptr;
   EGLContext egl_context_ = EGL_NO_CONTEXT;
+
+  wl_keyboard_keymap_format keymap_format_ =
+      WL_KEYBOARD_KEYMAP_FORMAT_NO_KEYMAP;
+  xkb_state* xkb_state_ = nullptr;
+  xkb_keymap* xkb_keymap_ = nullptr;
+  xkb_context* xkb_context_ = nullptr;
 
 #ifdef USE_XDG_SHELL
   static void XdgWmBasePingHandler(void* data,
