@@ -3,6 +3,7 @@
 .sconsign.dblite
 .svn/
 .vscode
+.kdev4
 
 .DS_Store
 *.swp
@@ -34,3 +35,5 @@ Icon?
 
 *.sublime-workspace
 cmake-*/
+
+*.kdev4
