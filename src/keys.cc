@@ -103,6 +103,7 @@ static void createKeyTables(void) {
   publicKeys[KEY_DELETE]     = GLFW_KEY_DELETE;
   publicKeys[KEY_BACKSPACE]  = GLFW_KEY_BACKSPACE;
   publicKeys[KEY_ENTER]      = GLFW_KEY_ENTER;
+  publicKeys[KEY_SPACE]      = GLFW_KEY_SPACE;
   publicKeys[KEY_HOME]       = GLFW_KEY_HOME;
   publicKeys[KEY_END]        = GLFW_KEY_END;
   publicKeys[KEY_PAGEUP]     = GLFW_KEY_PAGE_UP;

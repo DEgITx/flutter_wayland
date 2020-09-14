@@ -31,7 +31,10 @@ class FlutterApplication {
   };
   class EventListener {
    public:
-    virtual void OnKeyboardKey(uint32_t scanCode, bool pressed) = 0;
+    virtual void OnKeyboardKey(uint32_t keyCode,
+                               uint32_t mappedKeyCode,
+                               uint32_t utf32,
+                               bool pressed) = 0;
   };
   class EventEmitter {
    protected:
@@ -67,9 +70,13 @@ class FlutterApplication {
    public:
     DisplayEventListener(FlutterApplication* p) { parent = p; }
 
-    void OnKeyboardKey(uint32_t scanCode, bool pressed) {
-      SPDLOG_DEBUG("scanCode = {} pressed = {}", scanCode, pressed);
-      parent->OnKeyboardKey(scanCode, pressed);
+    void OnKeyboardKey(uint32_t keyCode,
+                       uint32_t mappedKeyCode,
+                       uint32_t utf32,
+                       bool pressed) {
+      SPDLOG_DEBUG("keyCode = {} mappedKeyCode = {} utf32 = U+{} pressed = {}",
+                   keyCode, mappedKeyCode, utf32, pressed);
+      parent->OnKeyboardKey(keyCode, mappedKeyCode, utf32, pressed);
     }
   } display_event_listener_;
 
@@ -79,6 +86,7 @@ class FlutterApplication {
     {"scanCode", 0},
     {"modifiers", 0},
     {"toolkit", "glfw"},
+    {"unicodeScalarValues", 0},
     {"type", ""}
   };
 
@@ -88,7 +96,10 @@ class FlutterApplication {
   FlutterEngine engine_ = nullptr;
   int last_button_ = 0;
 
-  void OnKeyboardKey(uint32_t scanCode, bool pressed);
+  void OnKeyboardKey(uint32_t keyCode,
+                     uint32_t mappedKeyCode,
+                     uint32_t utf32,
+                     bool pressed);
 
   bool SendFlutterPointerEvent(FlutterPointerPhase phase, double x, double y);
   bool SendPlatformMessage(const char* channel,

@@ -17,6 +17,7 @@ pkg_check_modules(WAYLAND_CLIENT REQUIRED wayland-client)
 pkg_check_modules(WAYLAND_EGL    REQUIRED wayland-egl)
 pkg_check_modules(EGL            REQUIRED egl)
 pkg_check_modules(GLFW           REQUIRED glfw3)
+pkg_check_modules(XKB            REQUIRED xkbcommon)
 
 download_project(PROJ                fmt
                  GIT_REPOSITORY      https://github.com/fmtlib/fmt.git
@@ -87,6 +88,7 @@ target_link_libraries(flutter_wayland
   ${WAYLAND_CLIENT_LIBRARIES}
   ${WAYLAND_EGL_LIBRARIES}
   ${EGL_LIBRARIES}
+  ${XKB_LIBRARIES}
   ${FLUTTER_LIBRARY}
 )
 
@@ -96,6 +98,7 @@ target_include_directories(flutter_wayland
   ${WAYLAND_EGL_INCLUDE_DIRS}
   ${EGL_INCLUDE_DIRS}
   ${GLFW_INCLUDE_DIRS}
+  ${XKB_INCLUDE_DIRS}
   ${CMAKE_BINARY_DIR}
   ${FLUTTER_INCLUDE_DIR}
 )
