@@ -22,10 +22,54 @@
 
 #pragma once
 
+#include <fmt/format.h>
 #include <stdint.h>
 
 namespace flutter {
 
-int toGLFWKeyCode(const uint32_t key);
+class SimpleKeyboardModifiers {
+ private:
+  bool shift_ = false;
+  bool ctrl_ = false;
+  bool alt_ = false;
+  bool super_ = false;
+  bool caps_ = false;
+  bool num_ = false;
 
-} // namespace flutter
+ public:
+  SimpleKeyboardModifiers() {}
+  SimpleKeyboardModifiers(bool shift,
+                     bool ctrl,
+                     bool alt,
+                     bool super,
+                     bool caps,
+                     bool num)
+      : shift_(shift),
+        ctrl_(ctrl),
+        alt_(alt),
+        super_(super),
+        caps_(caps),
+        num_(num) {}
+
+  bool getShift() { return shift_; }
+
+  bool getCtrl() { return ctrl_; }
+
+  bool getAlt() { return alt_; }
+
+  bool getSuper() { return super_; }
+
+  bool getCaps() { return caps_; }
+
+  bool getNum() { return num_; }
+
+  std::string ToString() {
+    return fmt::format("[shift {} ctrl {} alt {} super {} caps {} num {}]",
+                       shift_, ctrl_, alt_, super_, caps_, num_);
+  }
+};
+
+int toGLFWKeyCode(const uint32_t key);
+int toGLFWModifiers(SimpleKeyboardModifiers& mods);
+
+}  // namespace flutter

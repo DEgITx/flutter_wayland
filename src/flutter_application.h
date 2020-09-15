@@ -34,7 +34,8 @@ class FlutterApplication {
     virtual void OnKeyboardKey(uint32_t evdevKeycode,
                                uint32_t xkbKeycode,
                                uint32_t utf32,
-                               bool pressed) = 0;
+                               bool pressed,
+                               SimpleKeyboardModifiers& mods) = 0;
   };
   class EventEmitter {
    protected:
@@ -73,10 +74,12 @@ class FlutterApplication {
     void OnKeyboardKey(uint32_t evdevKeycode,
                        uint32_t xkbKeycode,
                        uint32_t utf32,
-                       bool pressed) {
-      SPDLOG_DEBUG("evdevKeycode = {} xkbKeycode = {} utf32 = U+{} pressed = {}",
-                   evdevKeycode, xkbKeycode, utf32, pressed);
-      parent->OnKeyboardKey(evdevKeycode, xkbKeycode, utf32, pressed);
+                       bool pressed,
+                       SimpleKeyboardModifiers& mods) {
+      SPDLOG_DEBUG(
+          "evdevKeycode = {} xkbKeycode = {} utf32 = U+{:X} pressed = {}",
+          evdevKeycode, xkbKeycode, utf32, pressed);
+      parent->OnKeyboardKey(evdevKeycode, xkbKeycode, utf32, pressed, mods);
     }
   } display_event_listener_;
 
@@ -99,7 +102,8 @@ class FlutterApplication {
   void OnKeyboardKey(uint32_t evdevKeycode,
                      uint32_t xkbKeycode,
                      uint32_t utf32,
-                     bool pressed);
+                     bool pressed,
+                     SimpleKeyboardModifiers& mods);
 
   bool SendFlutterPointerEvent(FlutterPointerPhase phase, double x, double y);
   bool SendPlatformMessage(const char* channel,

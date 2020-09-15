@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <xkbcommon/xkbcommon-names.h>
 
 #include <cstring>
 
@@ -107,6 +108,7 @@ void WaylandDisplay::KeyboardHandleKey(void* data,
   uint32_t evdevKeycode = key;
   uint32_t xkbKeycode;
   uint32_t utf32;
+  SimpleKeyboardModifiers mods;
 
   switch (keymap_format_) {
     case WL_KEYBOARD_KEYMAP_FORMAT_NO_KEYMAP: {
@@ -116,13 +118,29 @@ void WaylandDisplay::KeyboardHandleKey(void* data,
     }
     case WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1: {
       xkbKeycode = evdevKeycode + 8;  // See wl_keyboard_keymap_format docs
+
       utf32 = xkb_state_key_get_utf32(xkb_state_, xkbKeycode);
 
       char name[64];
       xkb_keysym_t keysym = xkb_state_key_get_one_sym(xkb_state_, xkbKeycode);
       xkb_keysym_get_name(keysym, name, sizeof(name));
 
-      SPDLOG_DEBUG("keysym = {} utf32 = U+{}", keysym, utf32);
+      mods = SimpleKeyboardModifiers(
+          xkb_state_mod_name_is_active(xkb_state_, XKB_MOD_NAME_SHIFT,
+                                       XKB_STATE_MODS_EFFECTIVE) == 1,
+          xkb_state_mod_name_is_active(xkb_state_, XKB_MOD_NAME_CTRL,
+                                       XKB_STATE_MODS_EFFECTIVE) == 1,
+          xkb_state_mod_name_is_active(xkb_state_, XKB_MOD_NAME_ALT,
+                                       XKB_STATE_MODS_EFFECTIVE) == 1,
+          xkb_state_mod_name_is_active(xkb_state_, XKB_MOD_NAME_LOGO,
+                                       XKB_STATE_MODS_EFFECTIVE) == 1,
+          xkb_state_mod_name_is_active(xkb_state_, XKB_MOD_NAME_CAPS,
+                                       XKB_STATE_MODS_EFFECTIVE) == 1,
+          xkb_state_mod_name_is_active(xkb_state_, XKB_MOD_NAME_NUM,
+                                       XKB_STATE_MODS_EFFECTIVE) == 1);
+
+      SPDLOG_DEBUG("keysym = {} utf32 = U+{:X} mods = {}", keysym, utf32,
+                   mods.ToString());
       SPDLOG_DEBUG("The key '{}' was {}", name, action);
       break;
     }
@@ -135,7 +153,7 @@ void WaylandDisplay::KeyboardHandleKey(void* data,
 
   for (auto listener = kEventListeners.begin();
        listener != kEventListeners.end(); ++listener) {
-    (*listener)->OnKeyboardKey(evdevKeycode, xkbKeycode, utf32, state);
+    (*listener)->OnKeyboardKey(evdevKeycode, xkbKeycode, utf32, state, mods);
   }
 }
 
