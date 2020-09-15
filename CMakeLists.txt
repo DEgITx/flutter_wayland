@@ -16,7 +16,6 @@ find_package(PkgConfig)
 pkg_check_modules(WAYLAND_CLIENT REQUIRED wayland-client)
 pkg_check_modules(WAYLAND_EGL    REQUIRED wayland-egl)
 pkg_check_modules(EGL            REQUIRED egl)
-pkg_check_modules(GLFW           REQUIRED glfw3)
 pkg_check_modules(XKB            REQUIRED xkbcommon)
 
 download_project(PROJ                fmt
@@ -97,7 +96,6 @@ target_include_directories(flutter_wayland
   ${WAYLAND_CLIENT_INCLUDE_DIRS}
   ${WAYLAND_EGL_INCLUDE_DIRS}
   ${EGL_INCLUDE_DIRS}
-  ${GLFW_INCLUDE_DIRS}
   ${XKB_INCLUDE_DIRS}
   ${CMAKE_BINARY_DIR}
   ${FLUTTER_INCLUDE_DIR}
