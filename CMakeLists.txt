@@ -3,12 +3,16 @@
 # found in the LICENSE file.
 
 cmake_minimum_required(VERSION 3.5.2)
+project(flutter_wayland)
 
 include(DownloadProject/DownloadProject.cmake)
 
-project(flutter_wayland)
-
 option(WITH_XDG_SHELL "Use xdg-shell protocol extension" OFF)
+option(LIBERTY "Compile under librty platform" OFF)
+
+if(LIBERTY)
+  set(CMAKE_TOOLCHAIN_FILE toolchain.cmake)
+endif()
 
 set(CMAKE_CXX_STANDARD 14)
 
@@ -66,12 +70,24 @@ if(WITH_XDG_SHELL)
   add_definitions(-DUSE_XDG_SHELL)
 endif()
 
+if(LIBERTY)
+  add_definitions(-DGLFW_INCLUDE_ES1)
+endif()
+
 set(FLUTTER_PATH "" CACHE STRING "Flutter Engine path")
 if(NOT FLUTTER_PATH STREQUAL "")
+  if(LIBERTY)
+    set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY BOTH)
+    set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE BOTH)
+  endif()
   find_library(FLUTTER_LIBRARY NAMES flutter_engine HINTS ${FLUTTER_PATH})
   find_path(FLUTTER_INCLUDE_DIR flutter_embedder.h HINTS ${FLUTTER_PATH})
   file(COPY ${FLUTTER_INCLUDE_DIR}/icudtl.dat
         DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+  if(LIBERTY)
+    set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+    set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+  endif()
 else()
   set(FLUTTER_LIBRARY "flutter_engine")
   set(FLUTTER_INCLUDE_DIR "")
