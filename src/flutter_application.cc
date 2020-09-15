@@ -212,9 +212,11 @@ bool FlutterApplication::SendPlatformMessage(const char* channel,
 void FlutterApplication::OnKeyboardKey(uint32_t evdevKeycode,
                                        uint32_t xkbKeycode,
                                        uint32_t utf32,
-                                       bool pressed) {
+                                       bool pressed,
+                                       SimpleKeyboardModifiers& mods) {
   kKeyEventMessage["keyCode"] = toGLFWKeyCode(evdevKeycode);
   kKeyEventMessage["scanCode"] = xkbKeycode;
+  kKeyEventMessage["modifiers"] = toGLFWModifiers(mods);
   kKeyEventMessage["unicodeScalarValues"] = utf32;
   kKeyEventMessage["type"] = pressed ? "keydown" : "keyup";
 
