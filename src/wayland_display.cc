@@ -104,19 +104,38 @@ void WaylandDisplay::KeyboardHandleKey(void* data,
   std::string action =
       state == WL_KEYBOARD_KEY_STATE_PRESSED ? "pressed" : "released";
 
-  uint32_t mappedKey = key + (keymap_format_ * 8);
+  uint32_t evdevKeycode = key;
+  uint32_t xkbKeycode;
+  uint32_t utf32;
 
-  xkb_keysym_t keysym = xkb_state_key_get_one_sym(xkb_state_, mappedKey);
-  uint32_t utf32 = xkb_state_key_get_utf32(xkb_state_, mappedKey);
-  char name[64];
-  xkb_keysym_get_name(keysym, name, sizeof(name));
+  switch (keymap_format_) {
+    case WL_KEYBOARD_KEYMAP_FORMAT_NO_KEYMAP: {
+      xkbKeycode = 0;
+      utf32 = 0;
+      break;
+    }
+    case WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1: {
+      xkbKeycode = evdevKeycode + 8;  // See wl_keyboard_keymap_format docs
+      utf32 = xkb_state_key_get_utf32(xkb_state_, xkbKeycode);
 
-  SPDLOG_DEBUG("keysym = {} utf32 = U+{}", keysym, utf32);
-  SPDLOG_DEBUG("The key '{}' was {}", name, action);
+      char name[64];
+      xkb_keysym_t keysym = xkb_state_key_get_one_sym(xkb_state_, xkbKeycode);
+      xkb_keysym_get_name(keysym, name, sizeof(name));
+
+      SPDLOG_DEBUG("keysym = {} utf32 = U+{}", keysym, utf32);
+      SPDLOG_DEBUG("The key '{}' was {}", name, action);
+      break;
+    }
+
+    default: {
+      SPDLOG_ERROR("Unexpected keymap format: {}", keymap_format_);
+      return;
+    }
+  }
 
   for (auto listener = kEventListeners.begin();
        listener != kEventListeners.end(); ++listener) {
-    (*listener)->OnKeyboardKey(key, mappedKey, utf32, state);
+    (*listener)->OnKeyboardKey(evdevKeycode, xkbKeycode, utf32, state);
   }
 }
 

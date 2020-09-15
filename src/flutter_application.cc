@@ -209,12 +209,12 @@ bool FlutterApplication::SendPlatformMessage(const char* channel,
   return message_result == kSuccess;
 }
 
-void FlutterApplication::OnKeyboardKey(uint32_t keyCode,
-                                       uint32_t mappedKeyCode,
+void FlutterApplication::OnKeyboardKey(uint32_t evdevKeycode,
+                                       uint32_t xkbKeycode,
                                        uint32_t utf32,
                                        bool pressed) {
-  kKeyEventMessage["keyCode"] = toGLFWKeyCode(keyCode);
-  kKeyEventMessage["scanCode"] = mappedKeyCode;
+  kKeyEventMessage["keyCode"] = toGLFWKeyCode(evdevKeycode);
+  kKeyEventMessage["scanCode"] = xkbKeycode;
   kKeyEventMessage["unicodeScalarValues"] = utf32;
   kKeyEventMessage["type"] = pressed ? "keydown" : "keyup";
 
