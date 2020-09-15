@@ -31,8 +31,8 @@ class FlutterApplication {
   };
   class EventListener {
    public:
-    virtual void OnKeyboardKey(uint32_t keyCode,
-                               uint32_t mappedKeyCode,
+    virtual void OnKeyboardKey(uint32_t evdevKeycode,
+                               uint32_t xkbKeycode,
                                uint32_t utf32,
                                bool pressed) = 0;
   };
@@ -70,13 +70,13 @@ class FlutterApplication {
    public:
     DisplayEventListener(FlutterApplication* p) { parent = p; }
 
-    void OnKeyboardKey(uint32_t keyCode,
-                       uint32_t mappedKeyCode,
+    void OnKeyboardKey(uint32_t evdevKeycode,
+                       uint32_t xkbKeycode,
                        uint32_t utf32,
                        bool pressed) {
-      SPDLOG_DEBUG("keyCode = {} mappedKeyCode = {} utf32 = U+{} pressed = {}",
-                   keyCode, mappedKeyCode, utf32, pressed);
-      parent->OnKeyboardKey(keyCode, mappedKeyCode, utf32, pressed);
+      SPDLOG_DEBUG("evdevKeycode = {} xkbKeycode = {} utf32 = U+{} pressed = {}",
+                   evdevKeycode, xkbKeycode, utf32, pressed);
+      parent->OnKeyboardKey(evdevKeycode, xkbKeycode, utf32, pressed);
     }
   } display_event_listener_;
 
@@ -96,8 +96,8 @@ class FlutterApplication {
   FlutterEngine engine_ = nullptr;
   int last_button_ = 0;
 
-  void OnKeyboardKey(uint32_t keyCode,
-                     uint32_t mappedKeyCode,
+  void OnKeyboardKey(uint32_t evdevKeycode,
+                     uint32_t xkbKeycode,
                      uint32_t utf32,
                      bool pressed);
 
