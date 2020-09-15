@@ -2,15 +2,20 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+option(RDK "Compile under RDK platform" OFF)
+
+if(RDK)
+  set(CMAKE_TOOLCHAIN_FILE toolchain.cmake)
+endif()
+
 cmake_minimum_required(VERSION 3.5.2)
+project(flutter_wayland)
+
+set(CMAKE_CXX_STANDARD 14)
 
 include(DownloadProject/DownloadProject.cmake)
 
-project(flutter_wayland)
-
 option(WITH_XDG_SHELL "Use xdg-shell protocol extension" OFF)
-
-set(CMAKE_CXX_STANDARD 14)
 
 find_package(PkgConfig)
 pkg_check_modules(WAYLAND_CLIENT REQUIRED wayland-client)
@@ -66,12 +71,24 @@ if(WITH_XDG_SHELL)
   add_definitions(-DUSE_XDG_SHELL)
 endif()
 
+if(RDK)
+  add_definitions(-DGLFW_INCLUDE_ES1)
+endif()
+
 set(FLUTTER_PATH "" CACHE STRING "Flutter Engine path")
 if(NOT FLUTTER_PATH STREQUAL "")
+  if(RDK)
+    set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY BOTH)
+    set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE BOTH)
+  endif()
   find_library(FLUTTER_LIBRARY NAMES flutter_engine HINTS ${FLUTTER_PATH})
   find_path(FLUTTER_INCLUDE_DIR flutter_embedder.h HINTS ${FLUTTER_PATH})
   file(COPY ${FLUTTER_INCLUDE_DIR}/icudtl.dat
         DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+  if(RDK)
+    set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+    set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+  endif()
 else()
   set(FLUTTER_LIBRARY "flutter_engine")
   set(FLUTTER_INCLUDE_DIR "")
