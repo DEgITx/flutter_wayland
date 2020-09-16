@@ -8,7 +8,6 @@
 
 #include "wayland_display.h"
 
-#include <stdlib.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <xkbcommon/xkbcommon-names.h>
@@ -91,6 +90,25 @@ void WaylandDisplay::KeyboardHandleLeave(void* data,
                                          uint32_t serial,
                                          struct wl_surface* surface) {
   SPDLOG_DEBUG("Keyboard lost focus");
+  if (key_repeat_timer_handle_) {
+    uv_timer_stop(key_repeat_timer_handle_);
+  }
+}
+
+SimpleKeyboardModifiers WaylandDisplay::KeyboardGetModifiers() {
+  return SimpleKeyboardModifiers(
+      xkb_state_mod_name_is_active(xkb_state_, XKB_MOD_NAME_SHIFT,
+                                   XKB_STATE_MODS_EFFECTIVE) == 1,
+      xkb_state_mod_name_is_active(xkb_state_, XKB_MOD_NAME_CTRL,
+                                   XKB_STATE_MODS_EFFECTIVE) == 1,
+      xkb_state_mod_name_is_active(xkb_state_, XKB_MOD_NAME_ALT,
+                                   XKB_STATE_MODS_EFFECTIVE) == 1,
+      xkb_state_mod_name_is_active(xkb_state_, XKB_MOD_NAME_LOGO,
+                                   XKB_STATE_MODS_EFFECTIVE) == 1,
+      xkb_state_mod_name_is_active(xkb_state_, XKB_MOD_NAME_CAPS,
+                                   XKB_STATE_MODS_EFFECTIVE) == 1,
+      xkb_state_mod_name_is_active(xkb_state_, XKB_MOD_NAME_NUM,
+                                   XKB_STATE_MODS_EFFECTIVE) == 1);
 }
 
 void WaylandDisplay::KeyboardHandleKey(void* data,
@@ -101,9 +119,6 @@ void WaylandDisplay::KeyboardHandleKey(void* data,
                                        uint32_t state) {
   SPDLOG_DEBUG("key = {} state = {} keymap_format_ = {}", key, state,
                keymap_format_);
-
-  std::string action =
-      state == WL_KEYBOARD_KEY_STATE_PRESSED ? "pressed" : "released";
 
   uint32_t evdevKeycode = key;
   uint32_t xkbKeycode;
@@ -125,23 +140,29 @@ void WaylandDisplay::KeyboardHandleKey(void* data,
       xkb_keysym_t keysym = xkb_state_key_get_one_sym(xkb_state_, xkbKeycode);
       xkb_keysym_get_name(keysym, name, sizeof(name));
 
-      mods = SimpleKeyboardModifiers(
-          xkb_state_mod_name_is_active(xkb_state_, XKB_MOD_NAME_SHIFT,
-                                       XKB_STATE_MODS_EFFECTIVE) == 1,
-          xkb_state_mod_name_is_active(xkb_state_, XKB_MOD_NAME_CTRL,
-                                       XKB_STATE_MODS_EFFECTIVE) == 1,
-          xkb_state_mod_name_is_active(xkb_state_, XKB_MOD_NAME_ALT,
-                                       XKB_STATE_MODS_EFFECTIVE) == 1,
-          xkb_state_mod_name_is_active(xkb_state_, XKB_MOD_NAME_LOGO,
-                                       XKB_STATE_MODS_EFFECTIVE) == 1,
-          xkb_state_mod_name_is_active(xkb_state_, XKB_MOD_NAME_CAPS,
-                                       XKB_STATE_MODS_EFFECTIVE) == 1,
-          xkb_state_mod_name_is_active(xkb_state_, XKB_MOD_NAME_NUM,
-                                       XKB_STATE_MODS_EFFECTIVE) == 1);
+      mods = KeyboardGetModifiers();
 
       SPDLOG_DEBUG("keysym = {} utf32 = U+{:X} mods = {}", keysym, utf32,
                    mods.ToString());
-      SPDLOG_DEBUG("The key '{}' was {}", name, action);
+      SPDLOG_DEBUG("The key '{}' was {}", name,
+                   WL_KEYBOARD_KEY_STATE_PRESSED ? "pressed" : "released");
+
+      if (key_repeat_timer_handle_) {
+        if (state == WL_KEYBOARD_KEY_STATE_PRESSED &&
+            xkb_keymap_key_repeats(xkb_keymap_, xkbKeycode) == 1) {
+          last_evdev_keycode_ = evdevKeycode;
+          last_xkb_keycode_ = xkbKeycode;
+          last_utf32_ = utf32;
+          uv_timer_start(key_repeat_timer_handle_,
+                         cify([self = this](uv_timer_t* handle) {
+                           self->KeyboardHandleRepeat(handle);
+                         }),
+                         repeat_delay_, 1000 / repeat_rate_);
+        } else if (state == WL_KEYBOARD_KEY_STATE_RELEASED &&
+                   xkbKeycode == last_xkb_keycode_) {
+          uv_timer_stop(key_repeat_timer_handle_);
+        }
+      }
       break;
     }
 
@@ -154,6 +175,36 @@ void WaylandDisplay::KeyboardHandleKey(void* data,
   for (auto listener = kEventListeners.begin();
        listener != kEventListeners.end(); ++listener) {
     (*listener)->OnKeyboardKey(evdevKeycode, xkbKeycode, utf32, state, mods);
+  }
+}
+
+void WaylandDisplay::KeyboardHandleRepeat(uv_timer_t* handle) {
+  if (handle == key_repeat_timer_handle_) {
+    switch (keymap_format_) {
+      case WL_KEYBOARD_KEYMAP_FORMAT_NO_KEYMAP: {
+        return;
+      }
+
+      case WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1: {
+        uint32_t evdevKeycode = last_evdev_keycode_;
+        uint32_t xkbKeycode = last_xkb_keycode_;
+        uint32_t utf32 = last_utf32_;
+        SimpleKeyboardModifiers mods = KeyboardGetModifiers();
+
+        for (auto listener = kEventListeners.begin();
+             listener != kEventListeners.end(); ++listener) {
+          (*listener)->OnKeyboardKey(evdevKeycode, xkbKeycode, utf32, false,
+                                     mods);
+          (*listener)->OnKeyboardKey(evdevKeycode, xkbKeycode, utf32, true,
+                                     mods);
+        }
+        break;
+      }
+
+      default: {
+        return;
+      }
+    }
   }
 }
 
@@ -176,6 +227,8 @@ void WaylandDisplay::KeyboardHandleRepeatInfo(void* data,
                                               int32_t rate,
                                               int32_t delay) {
   SPDLOG_DEBUG("rate = {} delay = {}", rate, delay);
+  repeat_rate_ = rate;
+  repeat_delay_ = delay;
 }
 
 void WaylandDisplay::SeatHandleCapabilities(void* data,
@@ -351,15 +404,45 @@ bool WaylandDisplay::IsValid() const {
   return valid_;
 }
 
+void WaylandDisplay::ProcessWaylandEvents(uv_poll_t* handle,
+                                          int status,
+                                          int events) {
+  SPDLOG_TRACE("status = {} events = {}", status, events);
+  wl_display_dispatch(display_);
+}
+
 bool WaylandDisplay::Run() {
+  SPDLOG_DEBUG("valid_ = {}", valid_);
+
   if (!valid_) {
     SPDLOG_ERROR("Could not run an invalid display.");
     return false;
   }
 
-  while (valid_) {
-    wl_display_dispatch(display_);
-  }
+  uv_loop_t* loop = new uv_loop_t;
+  uv_loop_init(loop);
+
+  uv_poll_t* wl_events_poll_handle = new uv_poll_t;
+  uv_poll_init(loop, wl_events_poll_handle, wl_display_get_fd(display_));
+
+  key_repeat_timer_handle_ = new uv_timer_t;
+  uv_timer_init(loop, key_repeat_timer_handle_);
+
+  uv_poll_start(wl_events_poll_handle, UV_READABLE,
+                cify([self = this](uv_poll_t* handle, int status, int events) {
+                  self->ProcessWaylandEvents(handle, status, events);
+                }));
+
+  uv_run(loop, UV_RUN_DEFAULT);
+
+  uv_timer_stop(key_repeat_timer_handle_);
+  delete key_repeat_timer_handle_;
+
+  uv_poll_stop(wl_events_poll_handle);
+  delete wl_events_poll_handle;
+
+  uv_loop_close(loop);
+  delete loop;
 
   return true;
 }

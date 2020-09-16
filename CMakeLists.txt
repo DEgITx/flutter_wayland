@@ -46,6 +46,13 @@ download_project(PROJ                nlohmann_json
 )
 add_subdirectory(${nlohmann_json_SOURCE_DIR} ${nlohmann_json_BINARY_DIR})
 
+download_project(PROJ                libuv
+                 GIT_REPOSITORY      https://github.com/libuv/libuv
+                 GIT_TAG             v1.39.0
+                 UPDATE_DISCONNECTED 1
+)
+add_subdirectory(${libuv_SOURCE_DIR} ${libuv_BINARY_DIR})
+
 # Executable
 file(GLOB_RECURSE FLUTTER_WAYLAND_SRC
   "src/*.cc"
@@ -101,6 +108,7 @@ add_executable(flutter_wayland ${FLUTTER_WAYLAND_SRC})
 target_link_libraries(flutter_wayland
   spdlog::spdlog
   nlohmann_json::nlohmann_json
+  uv_a
   ${WAYLAND_CLIENT_LIBRARIES}
   ${WAYLAND_EGL_LIBRARIES}
   ${EGL_LIBRARIES}
