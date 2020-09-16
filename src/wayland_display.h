@@ -17,6 +17,8 @@
 #include <set>
 #include <string>
 
+#include <uv.h>
+
 #include "cify.h"
 #include "flutter_application.h"
 #include "macros.h"
@@ -124,6 +126,13 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate,
   xkb_keymap* xkb_keymap_ = nullptr;
   xkb_context* xkb_context_ = nullptr;
 
+  uint32_t last_evdev_keycode_ = 0;
+  uint32_t last_xkb_keycode_ = 0;
+  uint32_t last_utf32_ = 0;
+  uint64_t repeat_rate_ = 40;    // characters per second
+  uint64_t repeat_delay_ = 400;  // in milliseconds
+  uv_timer_t* key_repeat_timer_handle_ = nullptr;
+
 #ifdef USE_XDG_SHELL
   static void XdgWmBasePingHandler(void* data,
                                    struct xdg_wm_base* xdg_wm_base,
@@ -181,6 +190,10 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate,
                                 int32_t rate,
                                 int32_t delay);
 
+  void KeyboardHandleRepeat(uv_timer_t* handle);
+
+  SimpleKeyboardModifiers KeyboardGetModifiers();
+
   bool SetupEGL();
 
   void AnnounceRegistryInterface(struct wl_registry* wl_registry,
@@ -190,6 +203,8 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate,
 
   void UnannounceRegistryInterface(struct wl_registry* wl_registry,
                                    uint32_t name);
+
+  void ProcessWaylandEvents(uv_poll_t* handle, int status, int events);
 
   bool StopRunning();
 
