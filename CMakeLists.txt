@@ -73,6 +73,7 @@ endif()
 
 if(RDK)
   add_definitions(-DGLFW_INCLUDE_ES1)
+  set(WAYLAND_EGL_LIBRARIES ${WAYLAND_EGL_LIBRARIES} nxpl)
 endif()
 
 set(FLUTTER_PATH "" CACHE STRING "Flutter Engine path")
