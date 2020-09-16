@@ -641,6 +641,8 @@ void WaylandDisplay::AnnounceRegistryInterface(struct wl_registry* wl_registry,
                                                uint32_t name,
                                                const char* interface_name,
                                                uint32_t version) {
+  SPDLOG_DEBUG("name = {} interface_name = {} version = {}", name, interface_name, version);
+
   if (strcmp(interface_name, "wl_compositor") == 0) {
     compositor_ = static_cast<decltype(compositor_)>(
         wl_registry_bind(wl_registry, name, &wl_compositor_interface, 4));
@@ -663,7 +665,7 @@ void WaylandDisplay::AnnounceRegistryInterface(struct wl_registry* wl_registry,
 
   if (strcmp(interface_name, "wl_seat") == 0) {
     seat_ = static_cast<decltype(seat_)>(
-        wl_registry_bind(wl_registry, name, &wl_seat_interface, 7));
+        wl_registry_bind(wl_registry, name, &wl_seat_interface, 4));
     wl_seat_add_listener(seat_, &kSeatListener, NULL);
     return;
   }
