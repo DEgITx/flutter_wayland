@@ -405,6 +405,59 @@ bool WaylandDisplay::SetupEGL() {
     return false;
   }
 
+  egl_display_ = eglGetDisplay(display_);
+  if (egl_display_ == EGL_NO_DISPLAY) {
+    LogLastEGLError();
+    SPDLOG_ERROR("Could not access EGL display.");
+    return false;
+  }
+
+  if (eglInitialize(egl_display_, nullptr, nullptr) != EGL_TRUE) {
+    LogLastEGLError();
+    SPDLOG_ERROR("Could not initialize EGL display.");
+    return false;
+  }
+
+  if (eglBindAPI(EGL_OPENGL_ES_API) != EGL_TRUE) {
+    LogLastEGLError();
+    SPDLOG_ERROR("Could not bind the ES API.");
+    return false;
+  }
+
+  EGLConfig egl_config = nullptr;
+
+  // Choose an EGL config to use for the surface and context.
+  {
+    EGLint attribs[] = {
+        // clang-format off
+      EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+      EGL_SURFACE_TYPE,    EGL_WINDOW_BIT,
+      EGL_RED_SIZE,        8,
+      EGL_GREEN_SIZE,      8,
+      EGL_BLUE_SIZE,       8,
+      EGL_ALPHA_SIZE,      8,
+      EGL_DEPTH_SIZE,      0,
+      EGL_STENCIL_SIZE,    0,
+      EGL_NONE,            // termination sentinel
+        // clang-format on
+    };
+
+    EGLint config_count = 0;
+
+    if (eglChooseConfig(egl_display_, attribs, &egl_config, 1, &config_count) !=
+        EGL_TRUE) {
+      LogLastEGLError();
+      SPDLOG_ERROR("Error when attempting to choose an EGL surface config.");
+      return false;
+    }
+
+    if (config_count == 0 || egl_config == nullptr) {
+      LogLastEGLError();
+      SPDLOG_ERROR("No matching configs.");
+      return false;
+    }
+  }
+
   surface_ = wl_compositor_create_surface(compositor_);
 
   if (!surface_) {
@@ -447,64 +500,14 @@ bool WaylandDisplay::SetupEGL() {
   }
 #endif
 
+  SPDLOG_DEBUG("create egl window = {} size = {}x{}", fmt::ptr(surface_),
+               screen_width_, screen_height_);
+
   window_ = wl_egl_window_create(surface_, screen_width_, screen_height_);
 
   if (!window_) {
     SPDLOG_ERROR("Could not create EGL window.");
     return false;
-  }
-
-  if (eglBindAPI(EGL_OPENGL_ES_API) != EGL_TRUE) {
-    LogLastEGLError();
-    SPDLOG_ERROR("Could not bind the ES API.");
-    return false;
-  }
-
-  egl_display_ = eglGetDisplay(display_);
-  if (egl_display_ == EGL_NO_DISPLAY) {
-    LogLastEGLError();
-    SPDLOG_ERROR("Could not access EGL display.");
-    return false;
-  }
-
-  if (eglInitialize(egl_display_, nullptr, nullptr) != EGL_TRUE) {
-    LogLastEGLError();
-    SPDLOG_ERROR("Could not initialize EGL display.");
-    return false;
-  }
-
-  EGLConfig egl_config = nullptr;
-
-  // Choose an EGL config to use for the surface and context.
-  {
-    EGLint attribs[] = {
-        // clang-format off
-      EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
-      EGL_SURFACE_TYPE,    EGL_WINDOW_BIT,
-      EGL_RED_SIZE,        8,
-      EGL_GREEN_SIZE,      8,
-      EGL_BLUE_SIZE,       8,
-      EGL_ALPHA_SIZE,      8,
-      EGL_DEPTH_SIZE,      0,
-      EGL_STENCIL_SIZE,    0,
-      EGL_NONE,            // termination sentinel
-        // clang-format on
-    };
-
-    EGLint config_count = 0;
-
-    if (eglChooseConfig(egl_display_, attribs, &egl_config, 1, &config_count) !=
-        EGL_TRUE) {
-      LogLastEGLError();
-      SPDLOG_ERROR("Error when attempting to choose an EGL surface config.");
-      return false;
-    }
-
-    if (config_count == 0 || egl_config == nullptr) {
-      LogLastEGLError();
-      SPDLOG_ERROR("No matching configs.");
-      return false;
-    }
   }
 
   // Create an EGL window surface with the matched config.
