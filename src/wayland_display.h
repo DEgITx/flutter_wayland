@@ -45,9 +45,13 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate,
   const wl_seat_listener kSeatListener = {
       .capabilities = cify([self = this](void* data,
                                          struct wl_seat* wl_seat,
-                                         uint32_t capabilities) -> void {
+                                         uint32_t capabilities) {
         self->SeatHandleCapabilities(data, wl_seat, capabilities);
       }),
+      .name = cify(
+          [self = this](void* data, struct wl_seat* wl_seat, const char* name) {
+            self->SeatHandleName(data, wl_seat, name);
+          }),
   };
   const wl_keyboard_listener kKeyboardListener = {
       .keymap = cify([self = this](void* data,
@@ -87,6 +91,12 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate,
                                       uint32_t group) {
         self->KeyboardHandleModifiers(data, wl_keyboard, serial, mods_depressed,
                                       mods_latched, mods_locked, group);
+      }),
+      .repeat_info = cify([self = this](void* data,
+                                        struct wl_keyboard* wl_keyboard,
+                                        int32_t rate,
+                                        int32_t delay) {
+        self->KeyboardHandleRepeatInfo(data, wl_keyboard, rate, delay);
       }),
   };
   bool valid_ = false;
@@ -132,6 +142,8 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate,
 
   void SeatHandleCapabilities(void* data, struct wl_seat* seat, uint32_t caps);
 
+  void SeatHandleName(void* data, struct wl_seat* wl_seat, const char* name);
+
   void KeyboardHandleKeymap(void* data,
                             struct wl_keyboard* keyboard,
                             uint32_t format,
@@ -163,6 +175,11 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate,
                                uint32_t mods_latched,
                                uint32_t mods_locked,
                                uint32_t group);
+
+  void KeyboardHandleRepeatInfo(void* data,
+                                struct wl_keyboard* wl_keyboard,
+                                int32_t rate,
+                                int32_t delay);
 
   bool SetupEGL();
 

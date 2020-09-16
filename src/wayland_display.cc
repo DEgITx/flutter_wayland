@@ -171,6 +171,13 @@ void WaylandDisplay::KeyboardHandleModifiers(void* data,
                         0, 0, group);
 }
 
+void WaylandDisplay::KeyboardHandleRepeatInfo(void* data,
+                                              struct wl_keyboard* wl_keyboard,
+                                              int32_t rate,
+                                              int32_t delay) {
+  SPDLOG_DEBUG("rate = {} delay = {}", rate, delay);
+}
+
 void WaylandDisplay::SeatHandleCapabilities(void* data,
                                             struct wl_seat* seat,
                                             uint32_t caps) {
@@ -188,6 +195,12 @@ void WaylandDisplay::SeatHandleCapabilities(void* data,
   if (caps & WL_SEAT_CAPABILITY_TOUCH) {
     SPDLOG_INFO("Display has a touch screen");
   }
+}
+
+void WaylandDisplay::SeatHandleName(void* data,
+                                    struct wl_seat* wl_seat,
+                                    const char* name) {
+  SPDLOG_DEBUG("name = {}", name);
 }
 
 const wl_registry_listener WaylandDisplay::kRegistryListener = {
@@ -547,7 +560,7 @@ void WaylandDisplay::AnnounceRegistryInterface(struct wl_registry* wl_registry,
                                                uint32_t version) {
   if (strcmp(interface_name, "wl_compositor") == 0) {
     compositor_ = static_cast<decltype(compositor_)>(
-        wl_registry_bind(wl_registry, name, &wl_compositor_interface, 1));
+        wl_registry_bind(wl_registry, name, &wl_compositor_interface, 4));
     return;
   }
 
@@ -567,7 +580,7 @@ void WaylandDisplay::AnnounceRegistryInterface(struct wl_registry* wl_registry,
 
   if (strcmp(interface_name, "wl_seat") == 0) {
     seat_ = static_cast<decltype(seat_)>(
-        wl_registry_bind(wl_registry, name, &wl_seat_interface, 1));
+        wl_registry_bind(wl_registry, name, &wl_seat_interface, 7));
     wl_seat_add_listener(seat_, &kSeatListener, NULL);
     return;
   }
