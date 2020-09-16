@@ -17,6 +17,8 @@
 #include <set>
 #include <string>
 
+#include <uv.h>
+
 #include "cify.h"
 #include "flutter_application.h"
 #include "macros.h"
@@ -45,9 +47,13 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate,
   const wl_seat_listener kSeatListener = {
       .capabilities = cify([self = this](void* data,
                                          struct wl_seat* wl_seat,
-                                         uint32_t capabilities) -> void {
+                                         uint32_t capabilities) {
         self->SeatHandleCapabilities(data, wl_seat, capabilities);
       }),
+      .name = cify(
+          [self = this](void* data, struct wl_seat* wl_seat, const char* name) {
+            self->SeatHandleName(data, wl_seat, name);
+          }),
   };
   const wl_keyboard_listener kKeyboardListener = {
       .keymap = cify([self = this](void* data,
@@ -88,6 +94,12 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate,
         self->KeyboardHandleModifiers(data, wl_keyboard, serial, mods_depressed,
                                       mods_latched, mods_locked, group);
       }),
+      .repeat_info = cify([self = this](void* data,
+                                        struct wl_keyboard* wl_keyboard,
+                                        int32_t rate,
+                                        int32_t delay) {
+        self->KeyboardHandleRepeatInfo(data, wl_keyboard, rate, delay);
+      }),
   };
   bool valid_ = false;
   const int screen_width_;
@@ -114,6 +126,13 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate,
   xkb_keymap* xkb_keymap_ = nullptr;
   xkb_context* xkb_context_ = nullptr;
 
+  uint32_t last_evdev_keycode_ = 0;
+  uint32_t last_xkb_keycode_ = 0;
+  uint32_t last_utf32_ = 0;
+  uint64_t repeat_rate_ = 40;    // characters per second
+  uint64_t repeat_delay_ = 400;  // in milliseconds
+  uv_timer_t* key_repeat_timer_handle_ = nullptr;
+
 #ifdef USE_XDG_SHELL
   static void XdgWmBasePingHandler(void* data,
                                    struct xdg_wm_base* xdg_wm_base,
@@ -131,6 +150,8 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate,
 #endif
 
   void SeatHandleCapabilities(void* data, struct wl_seat* seat, uint32_t caps);
+
+  void SeatHandleName(void* data, struct wl_seat* wl_seat, const char* name);
 
   void KeyboardHandleKeymap(void* data,
                             struct wl_keyboard* keyboard,
@@ -164,6 +185,15 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate,
                                uint32_t mods_locked,
                                uint32_t group);
 
+  void KeyboardHandleRepeatInfo(void* data,
+                                struct wl_keyboard* wl_keyboard,
+                                int32_t rate,
+                                int32_t delay);
+
+  void KeyboardHandleRepeat(uv_timer_t* handle);
+
+  SimpleKeyboardModifiers KeyboardGetModifiers();
+
   bool SetupEGL();
 
   void AnnounceRegistryInterface(struct wl_registry* wl_registry,
@@ -173,6 +203,8 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate,
 
   void UnannounceRegistryInterface(struct wl_registry* wl_registry,
                                    uint32_t name);
+
+  void ProcessWaylandEvents(uv_poll_t* handle, int status, int events);
 
   bool StopRunning();
 
