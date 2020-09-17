@@ -26,7 +26,6 @@
 #include <xkbcommon/xkbcommon.h>
 #include <cstring>
 
-#include "GLFW/glfw3.h"
 #include "keys.h"
 
 namespace flutter {

@@ -31,8 +31,8 @@ class FlutterApplication {
   };
   class EventListener {
    public:
-    virtual void OnKeyboardKey(uint32_t evdevKeycode,
-                               uint32_t xkbKeycode,
+    virtual void OnKeyboardKey(uint32_t evdev_keycode,
+                               uint32_t xkb_keycode,
                                uint32_t utf32,
                                bool pressed,
                                SimpleKeyboardModifiers& mods) = 0;
@@ -71,19 +71,19 @@ class FlutterApplication {
    public:
     DisplayEventListener(FlutterApplication* p) { parent = p; }
 
-    void OnKeyboardKey(uint32_t evdevKeycode,
-                       uint32_t xkbKeycode,
+    void OnKeyboardKey(uint32_t evdev_keycode,
+                       uint32_t xkb_keycode,
                        uint32_t utf32,
                        bool pressed,
                        SimpleKeyboardModifiers& mods) {
       SPDLOG_DEBUG(
-          "evdevKeycode = {} xkbKeycode = {} utf32 = U+{:X} pressed = {}",
-          evdevKeycode, xkbKeycode, utf32, pressed);
-      parent->OnKeyboardKey(evdevKeycode, xkbKeycode, utf32, pressed, mods);
+          "evdev_keycode = {} xkb_keycode = {} utf32 = U+{:X} pressed = {}",
+          evdev_keycode, xkb_keycode, utf32, pressed);
+      parent->OnKeyboardKey(evdev_keycode, xkb_keycode, utf32, pressed, mods);
     }
   } display_event_listener_;
 
-  nlohmann::json kKeyEventMessage = {
+  nlohmann::json kKeyEventMessageLinux = {
     {"keyCode", 0},
     {"keymap", "linux"},
     {"scanCode", 0},
@@ -99,8 +99,8 @@ class FlutterApplication {
   FlutterEngine engine_ = nullptr;
   int last_button_ = 0;
 
-  void OnKeyboardKey(uint32_t evdevKeycode,
-                     uint32_t xkbKeycode,
+  void OnKeyboardKey(uint32_t evdev_keycode,
+                     uint32_t xkb_keycode,
                      uint32_t utf32,
                      bool pressed,
                      SimpleKeyboardModifiers& mods);

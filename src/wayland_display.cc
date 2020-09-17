@@ -120,24 +120,24 @@ void WaylandDisplay::KeyboardHandleKey(void* data,
   SPDLOG_DEBUG("key = {} state = {} keymap_format_ = {}", key, state,
                keymap_format_);
 
-  uint32_t evdevKeycode = key;
-  uint32_t xkbKeycode;
+  uint32_t evdev_keycode = key;
+  uint32_t xkb_keycode;
   uint32_t utf32;
   SimpleKeyboardModifiers mods;
 
   switch (keymap_format_) {
     case WL_KEYBOARD_KEYMAP_FORMAT_NO_KEYMAP: {
-      xkbKeycode = 0;
+      xkb_keycode = 0;
       utf32 = 0;
       break;
     }
     case WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1: {
-      xkbKeycode = evdevKeycode + 8;  // See wl_keyboard_keymap_format docs
+      xkb_keycode = evdev_keycode + 8;  // See wl_keyboard_keymap_format docs
 
-      utf32 = xkb_state_key_get_utf32(xkb_state_, xkbKeycode);
+      utf32 = xkb_state_key_get_utf32(xkb_state_, xkb_keycode);
 
       char name[64];
-      xkb_keysym_t keysym = xkb_state_key_get_one_sym(xkb_state_, xkbKeycode);
+      xkb_keysym_t keysym = xkb_state_key_get_one_sym(xkb_state_, xkb_keycode);
       xkb_keysym_get_name(keysym, name, sizeof(name));
 
       mods = KeyboardGetModifiers();
@@ -149,9 +149,9 @@ void WaylandDisplay::KeyboardHandleKey(void* data,
 
       if (key_repeat_timer_handle_) {
         if (state == WL_KEYBOARD_KEY_STATE_PRESSED &&
-            xkb_keymap_key_repeats(xkb_keymap_, xkbKeycode) == 1) {
-          last_evdev_keycode_ = evdevKeycode;
-          last_xkb_keycode_ = xkbKeycode;
+            xkb_keymap_key_repeats(xkb_keymap_, xkb_keycode) == 1) {
+          last_evdev_keycode_ = evdev_keycode;
+          last_xkb_keycode_ = xkb_keycode;
           last_utf32_ = utf32;
           uv_timer_start(key_repeat_timer_handle_,
                          cify([self = this](uv_timer_t* handle) {
@@ -159,7 +159,7 @@ void WaylandDisplay::KeyboardHandleKey(void* data,
                          }),
                          repeat_delay_, 1000 / repeat_rate_);
         } else if (state == WL_KEYBOARD_KEY_STATE_RELEASED &&
-                   xkbKeycode == last_xkb_keycode_) {
+                   xkb_keycode == last_xkb_keycode_) {
           uv_timer_stop(key_repeat_timer_handle_);
         }
       }
@@ -174,7 +174,7 @@ void WaylandDisplay::KeyboardHandleKey(void* data,
 
   for (auto listener = kEventListeners.begin();
        listener != kEventListeners.end(); ++listener) {
-    (*listener)->OnKeyboardKey(evdevKeycode, xkbKeycode, utf32, state, mods);
+    (*listener)->OnKeyboardKey(evdev_keycode, xkb_keycode, utf32, state, mods);
   }
 }
 
@@ -186,16 +186,16 @@ void WaylandDisplay::KeyboardHandleRepeat(uv_timer_t* handle) {
       }
 
       case WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1: {
-        uint32_t evdevKeycode = last_evdev_keycode_;
-        uint32_t xkbKeycode = last_xkb_keycode_;
+        uint32_t evdev_keycode = last_evdev_keycode_;
+        uint32_t xkb_keycode = last_xkb_keycode_;
         uint32_t utf32 = last_utf32_;
         SimpleKeyboardModifiers mods = KeyboardGetModifiers();
 
         for (auto listener = kEventListeners.begin();
              listener != kEventListeners.end(); ++listener) {
-          (*listener)->OnKeyboardKey(evdevKeycode, xkbKeycode, utf32, false,
+          (*listener)->OnKeyboardKey(evdev_keycode, xkb_keycode, utf32, false,
                                      mods);
-          (*listener)->OnKeyboardKey(evdevKeycode, xkbKeycode, utf32, true,
+          (*listener)->OnKeyboardKey(evdev_keycode, xkb_keycode, utf32, true,
                                      mods);
         }
         break;
