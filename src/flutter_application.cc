@@ -209,20 +209,22 @@ bool FlutterApplication::SendPlatformMessage(const char* channel,
   return message_result == kSuccess;
 }
 
-void FlutterApplication::OnKeyboardKey(uint32_t evdevKeycode,
-                                       uint32_t xkbKeycode,
+void FlutterApplication::OnKeyboardKey(uint32_t evdev_keycode,
+                                       uint32_t xkb_keycode,
                                        uint32_t utf32,
                                        bool pressed,
                                        SimpleKeyboardModifiers& mods) {
-  kKeyEventMessage["keyCode"] = toGLFWKeyCode(evdevKeycode);
-  kKeyEventMessage["scanCode"] = xkbKeycode;
-  kKeyEventMessage["modifiers"] = toGLFWModifiers(mods);
-  kKeyEventMessage["unicodeScalarValues"] = utf32;
-  kKeyEventMessage["type"] = pressed ? "keydown" : "keyup";
+  int glfw_keycode = toGLFWKeyCode(evdev_keycode);
 
-  std::string s = kKeyEventMessage.dump();
+  kKeyEventMessageLinux["keyCode"] = glfw_keycode;
+  kKeyEventMessageLinux["scanCode"] = xkb_keycode;
+  kKeyEventMessageLinux["modifiers"] = toGLFWModifiers(mods);
+  kKeyEventMessageLinux["unicodeScalarValues"] = utf32;
+  kKeyEventMessageLinux["type"] = pressed ? "keydown" : "keyup";
 
-  SPDLOG_TRACE("Sending PlatformMessage: {}", s);
+  std::string s = kKeyEventMessageLinux.dump();
+
+  SPDLOG_DEBUG("Sending PlatformMessage: {}", s);
 
   bool success = SendPlatformMessage(
       "flutter/keyevent", reinterpret_cast<const uint8_t*>(s.c_str()),

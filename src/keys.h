@@ -25,6 +25,8 @@
 #include <fmt/format.h>
 #include <stdint.h>
 
+#include "GLFW/glfw3.h"
+
 namespace flutter {
 
 class SimpleKeyboardModifiers {
