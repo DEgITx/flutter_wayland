@@ -13,7 +13,9 @@
 #include "wayland_display.h"
 #include "global_helpers.h"
 
+#ifdef LIBERTY
 #include <weston/config-parser.h>
+#endif
 
 namespace flutter {
 
