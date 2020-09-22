@@ -79,8 +79,8 @@ if(WITH_XDG_SHELL)
 endif()
 
 if(LIBERTY)
-  add_definitions(-DGLFW_INCLUDE_ES1)
-  set(WAYLAND_EGL_LIBRARIES ${WAYLAND_EGL_LIBRARIES} nxpl)
+  add_definitions(-DGLFW_INCLUDE_ES1 -DLIBERTY)
+  set(WAYLAND_EGL_LIBRARIES ${WAYLAND_EGL_LIBRARIES} nxpl display_manager)
 endif()
 
 set(FLUTTER_PATH "" CACHE STRING "Flutter Engine path")

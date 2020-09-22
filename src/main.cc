@@ -11,6 +11,9 @@
 #include "logger.h"
 #include "utils.h"
 #include "wayland_display.h"
+#include "global_helpers.h"
+
+#include <weston/config-parser.h>
 
 namespace flutter {
 
@@ -41,6 +44,42 @@ asset_bundle_path: The Flutter application code needs to be snapshotted using
 )~" << std::endl;
 }
 
+#ifdef LIBERTY
+
+static std::pair<unsigned int, unsigned int> getDisplaySize() {
+  unsigned int width = 0;
+  unsigned int height = 0;
+
+  weston_config* pConfig = weston_config_parse("/usr/bin/weston.ini");
+  if (pConfig != NULL) {
+    weston_config_section* pSection = weston_config_get_section(pConfig, "output", NULL, NULL);
+    if (pSection != NULL) {
+      char* displayModeStr = NULL;
+      weston_config_section_get_string(pSection, "mode", &displayModeStr, "1280x720");
+
+      if (displayModeStr != NULL) {
+        std::string screenGeometry(displayModeStr);
+        auto screenGeometryPair = splitStr(screenGeometry, "x");
+        width = std::stoi(screenGeometryPair[0]);
+        height = std::stoi(screenGeometryPair[1]);
+        free(displayModeStr);
+      } else {
+        SPDLOG_ERROR("cannot get 'mode' from 'output' section from weston.ini");
+      }
+    } else {
+      SPDLOG_ERROR("cannot get 'output' section from weston.ini");
+    }
+
+    weston_config_destroy(pConfig);
+  } else {
+    SPDLOG_ERROR("cannot read/parse weston.ini");
+  }
+
+  return std::make_pair(width, height);
+}
+
+#endif
+
 static bool Main(std::vector<std::string> args) {
   if (args.size() == 0) {
     std::cerr << "   <Invalid Arguments>   " << std::endl;
@@ -56,8 +95,17 @@ static bool Main(std::vector<std::string> args) {
     return false;
   }
 
-  const size_t kWidth = 800;
-  const size_t kHeight = 600;
+  size_t kWidth = 800;
+  size_t kHeight = 600;
+
+#ifdef LIBERTY
+  auto screenGeometry = getDisplaySize();
+  kWidth = screenGeometry.first;
+  kHeight = screenGeometry.second;
+
+  SPDLOG_DEBUG("weston display size = {}x{}",
+               kWidth, kHeight);
+#endif
 
   for (const auto& arg : args) {
     SPDLOG_DEBUG("Arg: {}", arg);
