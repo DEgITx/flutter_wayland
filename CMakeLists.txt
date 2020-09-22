@@ -8,7 +8,7 @@ if(RDK)
   set(CMAKE_TOOLCHAIN_FILE toolchain.cmake)
 endif()
 
-cmake_minimum_required(VERSION 3.5.2)
+cmake_minimum_required(VERSION 3.10)
 project(flutter_wayland)
 
 set(CMAKE_CXX_STANDARD 14)
