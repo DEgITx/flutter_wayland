@@ -292,9 +292,11 @@ const wl_shell_surface_listener WaylandDisplay::kShellSurfaceListener = {
     },
 };
 
-WaylandDisplay::WaylandDisplay(size_t width, size_t height)
+WaylandDisplay::WaylandDisplay(size_t width, size_t height, size_t width_align, size_t height_align)
     : screen_width_(width),
       screen_height_(height),
+      screen_width_align(width_align),
+      screen_height_align(height_align),
       xkb_context_(xkb_context_new(XKB_CONTEXT_NO_FLAGS)) {
   if (screen_width_ == 0 || screen_height_ == 0) {
     SPDLOG_ERROR("Invalid screen dimensions.");
@@ -599,7 +601,7 @@ bool WaylandDisplay::SetupEGL() {
   SPDLOG_DEBUG("create egl window = {} size = {}x{}", fmt::ptr(surface_),
                screen_width_, screen_height_);
 
-  window_ = wl_egl_window_create(surface_, screen_width_, screen_height_);
+  window_ = wl_egl_window_create(surface_, screen_width_ - (screen_width_align * 2), screen_height_ - (screen_height_align * 2));
 
   if (!window_) {
     SPDLOG_ERROR("Could not create EGL window.");
@@ -633,6 +635,8 @@ bool WaylandDisplay::SetupEGL() {
       return false;
     }
   }
+
+  wl_egl_window_resize(window_, screen_width_ - (screen_width_align * 2), screen_height_ - (screen_height_align * 2), screen_width_align, screen_height_align);
 
   return true;
 }

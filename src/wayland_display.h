@@ -28,7 +28,7 @@ namespace flutter {
 class WaylandDisplay : public FlutterApplication::RenderDelegate,
                        public FlutterApplication::EventEmitter {
  public:
-  WaylandDisplay(size_t width, size_t height);
+  WaylandDisplay(size_t width, size_t height, size_t widthAlign, size_t heightAlign);
 
   ~WaylandDisplay();
 
@@ -104,6 +104,8 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate,
   bool valid_ = false;
   const int screen_width_;
   const int screen_height_;
+  const int screen_width_align;
+  const int screen_height_align;
   wl_display* display_ = nullptr;
   wl_registry* registry_ = nullptr;
   wl_compositor* compositor_ = nullptr;
