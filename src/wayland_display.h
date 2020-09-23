@@ -41,6 +41,14 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate,
   bool Run();
 
  private:
+
+  enum InputSource {
+    INPUT_SOURCE_KEYBOARD,
+#ifdef USE_IARM_BUS
+    INPUT_SOURCE_IR,
+#endif
+  };
+
   static const wl_registry_listener kRegistryListener;
   static const wl_shell_surface_listener kShellSurfaceListener;
 #ifdef USE_XDG_SHELL
@@ -132,6 +140,7 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate,
   xkb_keymap* xkb_keymap_ = nullptr;
   xkb_context* xkb_context_ = nullptr;
 
+  InputSource last_input_source_;
   uint32_t last_evdev_keycode_ = 0;
   uint32_t last_xkb_keycode_ = 0;
   uint32_t last_utf32_ = 0;
