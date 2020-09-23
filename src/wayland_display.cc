@@ -150,6 +150,7 @@ void WaylandDisplay::KeyboardHandleKey(void* data,
       if (key_repeat_timer_handle_) {
         if (state == WL_KEYBOARD_KEY_STATE_PRESSED &&
             xkb_keymap_key_repeats(xkb_keymap_, xkb_keycode) == 1) {
+          last_input_source_ = INPUT_SOURCE_KEYBOARD;
           last_evdev_keycode_ = evdev_keycode;
           last_xkb_keycode_ = xkb_keycode;
           last_utf32_ = utf32;
@@ -182,30 +183,47 @@ void WaylandDisplay::KeyboardHandleKey(void* data,
 
 void WaylandDisplay::KeyboardHandleRepeat(uv_timer_t* handle) {
   if (handle == key_repeat_timer_handle_) {
-    switch (keymap_format_) {
-      case WL_KEYBOARD_KEYMAP_FORMAT_NO_KEYMAP: {
-        return;
-      }
+    uint32_t evdev_keycode;
+    uint32_t xkb_keycode;
+    uint32_t utf32;
+    SimpleKeyboardModifiers mods;
 
-      case WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1: {
-        uint32_t evdev_keycode = last_evdev_keycode_;
-        uint32_t xkb_keycode = last_xkb_keycode_;
-        uint32_t utf32 = last_utf32_;
-        SimpleKeyboardModifiers mods = KeyboardGetModifiers();
+    switch (last_input_source_) {
+      case INPUT_SOURCE_KEYBOARD: {
+        switch (keymap_format_) {
+          case WL_KEYBOARD_KEYMAP_FORMAT_NO_KEYMAP: {
+            return;
+          }
 
-        for (auto listener = kEventListeners.begin();
-             listener != kEventListeners.end(); ++listener) {
-          (*listener)->OnKeyboardKey(evdev_keycode, xkb_keycode, utf32, false,
-                                     mods);
-          (*listener)->OnKeyboardKey(evdev_keycode, xkb_keycode, utf32, true,
-                                     mods);
+          case WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1: {
+            evdev_keycode = last_evdev_keycode_;
+            xkb_keycode = last_xkb_keycode_;
+            utf32 = last_utf32_;
+            mods = KeyboardGetModifiers();
+            break;
+          }
+
+          default: {
+            return;
+          }
         }
         break;
       }
-
-      default: {
-        return;
+#ifdef USE_IARM_BUS
+      case INPUT_SOURCE_IR: {
+        evdev_keycode = last_evdev_keycode_;
+        xkb_keycode = last_xkb_keycode_;
+        utf32 = last_utf32_;
+        break;
       }
+#endif
+      default:
+        return;
+    }
+
+    for (auto listener = kEventListeners.begin();
+         listener != kEventListeners.end(); ++listener) {
+      (*listener)->OnKeyboardKey(evdev_keycode, xkb_keycode, utf32, true, mods);
     }
   }
 }
@@ -294,7 +312,10 @@ const wl_shell_surface_listener WaylandDisplay::kShellSurfaceListener = {
     },
 };
 
-WaylandDisplay::WaylandDisplay(size_t width, size_t height, size_t width_align, size_t height_align)
+WaylandDisplay::WaylandDisplay(size_t width,
+                               size_t height,
+                               size_t width_align,
+                               size_t height_align)
     : screen_width_(width),
       screen_height_(height),
       screen_width_align(width_align),
@@ -425,7 +446,7 @@ void WaylandDisplay::ProcessWaylandEvents(uv_poll_t* handle,
 
 #ifdef USE_IARM_BUS
 void WaylandDisplay::IrHandleKey(int key_code, int key_type, int key_src) {
-  SPDLOG_DEBUG("key_code = {} key_type = {} key_src = {}", key_code, key_type,
+  SPDLOG_TRACE("key_code = {} key_type = {} key_src = {}", key_code, key_type,
                key_src);
 
   uint32_t evdev_keycode = irToLinuxEvdevKeycode(key_code);
@@ -437,16 +458,31 @@ void WaylandDisplay::IrHandleKey(int key_code, int key_type, int key_src) {
        listener != kEventListeners.end(); ++listener) {
     switch (key_type) {
       case KET_KEYDOWN:
+        if (key_repeat_timer_handle_) {
+          last_input_source_ = INPUT_SOURCE_IR;
+          last_evdev_keycode_ = evdev_keycode;
+          last_xkb_keycode_ = xkb_keycode;
+          last_utf32_ = utf32;
+          uv_timer_start(key_repeat_timer_handle_,
+                         cify([self = this](uv_timer_t* handle) {
+                           self->KeyboardHandleRepeat(handle);
+                         }),
+                         repeat_delay_, 1000 / repeat_rate_);
+        }
         (*listener)->OnKeyboardKey(evdev_keycode, xkb_keycode, utf32, true,
                                    mods);
         break;
       case KET_KEYUP:
+        if (key_repeat_timer_handle_) {
+          if (xkb_keycode == last_xkb_keycode_) {
+            uv_timer_stop(key_repeat_timer_handle_);
+          }
+        }
         (*listener)->OnKeyboardKey(evdev_keycode, xkb_keycode, utf32, false,
                                    mods);
         break;
       case KET_KEYREPEAT:
-        (*listener)->OnKeyboardKey(evdev_keycode, xkb_keycode, utf32, true,
-                                   mods);
+        // Handle repeats programmatically
         break;
       default:
         SPDLOG_ERROR("Unknown key type: {}", key_type);
@@ -464,7 +500,7 @@ void WaylandDisplay::IARMEventHandler(const char* owner,
       case IARM_BUS_IRMGR_EVENT_IRKEY:
         IARM_Bus_IRMgr_EventData_t* event_data =
             (IARM_Bus_IRMgr_EventData_t*)data;
-        SPDLOG_DEBUG("keyCode = {} keyType = {} keySrc = {}",
+        SPDLOG_TRACE("keyCode = {} keyType = {} keySrc = {}",
                      event_data->data.irkey.keyCode,
                      event_data->data.irkey.keyType,
                      event_data->data.irkey.keySrc);
@@ -487,7 +523,7 @@ void WaylandDisplay::AsyncIARMEventHandler(uv_async_t* handle) {
   while (!events.empty()) {
     IARM_Bus_IRMgr_EventData_t event_data = events.back();
     events.pop_back();
-    SPDLOG_DEBUG("keyCode = {} keyType = {} keySrc = {}",
+    SPDLOG_TRACE("keyCode = {} keyType = {} keySrc = {}",
                  event_data.data.irkey.keyCode, event_data.data.irkey.keyType,
                  event_data.data.irkey.keySrc);
     IrHandleKey(event_data.data.irkey.keyCode, event_data.data.irkey.keyType,
@@ -703,9 +739,12 @@ bool WaylandDisplay::SetupEGL() {
 #endif
 
   SPDLOG_DEBUG("create egl window = {} size = {}x{}", fmt::ptr(surface_),
-               screen_width_ - (screen_width_align * 2), screen_height_ - (screen_height_align * 2));
+               screen_width_ - (screen_width_align * 2),
+               screen_height_ - (screen_height_align * 2));
 
-  window_ = wl_egl_window_create(surface_, screen_width_ - (screen_width_align * 2), screen_height_ - (screen_height_align * 2));
+  window_ =
+      wl_egl_window_create(surface_, screen_width_ - (screen_width_align * 2),
+                           screen_height_ - (screen_height_align * 2));
 
   if (!window_) {
     SPDLOG_ERROR("Could not create EGL window.");
@@ -740,7 +779,9 @@ bool WaylandDisplay::SetupEGL() {
     }
   }
 
-  wl_egl_window_resize(window_, screen_width_ - (screen_width_align * 2), screen_height_ - (screen_height_align * 2), screen_width_align, screen_height_align);
+  wl_egl_window_resize(window_, screen_width_ - (screen_width_align * 2),
+                       screen_height_ - (screen_height_align * 2),
+                       screen_width_align, screen_height_align);
 
   return true;
 }
