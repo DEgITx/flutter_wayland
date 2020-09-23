@@ -13,6 +13,10 @@
 #include "wayland-xdg-shell-client-protocol.h"
 #endif
 
+#ifdef USE_IARM_BUS
+#include "iarm.h"
+#endif
+
 #include <memory>
 #include <set>
 #include <string>
@@ -135,6 +139,12 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate,
   uint64_t repeat_delay_ = 400;  // in milliseconds
   uv_timer_t* key_repeat_timer_handle_ = nullptr;
 
+#ifdef USE_IARM_BUS
+  uv_async_t* ir_events_async_;
+  uv_rwlock_t ir_events_rw_lock_;
+  std::vector<IARM_Bus_IRMgr_EventData_t> ir_events_data_vector_;
+#endif
+
 #ifdef USE_XDG_SHELL
   static void XdgWmBasePingHandler(void* data,
                                    struct xdg_wm_base* xdg_wm_base,
@@ -195,6 +205,17 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate,
   void KeyboardHandleRepeat(uv_timer_t* handle);
 
   SimpleKeyboardModifiers KeyboardGetModifiers();
+
+#ifdef USE_IARM_BUS
+  void IrHandleKey(int key_code, int key_type, int key_src);
+
+  void IARMEventHandler(const char* owner,
+                        IARM_EventId_t eventId,
+                        void* data,
+                        size_t len);
+
+  void AsyncIARMEventHandler(uv_async_t* handle);
+#endif
 
   bool SetupEGL();
 

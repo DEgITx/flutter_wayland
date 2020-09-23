@@ -8,7 +8,7 @@ if(LIBERTY)
   set(CMAKE_TOOLCHAIN_FILE toolchain.cmake)
 endif()
 
-cmake_minimum_required(VERSION 3.5.2)
+cmake_minimum_required(VERSION 3.10)
 project(flutter_wayland)
 
 set(CMAKE_CXX_STANDARD 14)
@@ -81,6 +81,9 @@ endif()
 if(LIBERTY)
   add_definitions(-DGLFW_INCLUDE_ES1 -DLIBERTY)
   set(WAYLAND_EGL_LIBRARIES ${WAYLAND_EGL_LIBRARIES} nxpl display_manager)
+  add_definitions(-DUSE_IARM_BUS)
+  set(IARM_LIBRARIES ${IARM_LIBRARIES} IARMBus)
+  set(IARM_INCLUDE_DIRS ${IARM_INCLUDE_PATHS} ${CMAKE_SYSROOT}/usr/include/rdk/iarmbus ${CMAKE_SYSROOT}/usr/include/rdk/iarmmgrs-hal)
 endif()
 
 set(FLUTTER_PATH "" CACHE STRING "Flutter Engine path")
@@ -115,6 +118,7 @@ target_link_libraries(flutter_wayland
   ${EGL_LIBRARIES}
   ${XKB_LIBRARIES}
   ${FLUTTER_LIBRARY}
+  ${IARM_LIBRARIES}
 )
 
 target_include_directories(flutter_wayland
@@ -125,4 +129,5 @@ target_include_directories(flutter_wayland
   ${XKB_INCLUDE_DIRS}
   ${CMAKE_BINARY_DIR}
   ${FLUTTER_INCLUDE_DIR}
+  ${IARM_INCLUDE_DIRS}
 )
