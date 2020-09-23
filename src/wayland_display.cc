@@ -706,7 +706,7 @@ bool WaylandDisplay::SetupEGL() {
 #endif
 
   SPDLOG_DEBUG("create egl window = {} size = {}x{}", fmt::ptr(surface_),
-               screen_width_, screen_height_);
+               screen_width_ - (screen_width_align * 2), screen_height_ - (screen_height_align * 2));
 
   window_ = wl_egl_window_create(surface_, screen_width_ - (screen_width_align * 2), screen_height_ - (screen_height_align * 2));
 
