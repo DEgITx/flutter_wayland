@@ -174,7 +174,9 @@ void WaylandDisplay::KeyboardHandleKey(void* data,
 
   for (auto listener = kEventListeners.begin();
        listener != kEventListeners.end(); ++listener) {
-    (*listener)->OnKeyboardKey(evdev_keycode, xkb_keycode, utf32, state, mods);
+    (*listener)->OnKeyboardKey(
+        evdev_keycode, xkb_keycode, utf32,
+        state == WL_KEYBOARD_KEY_STATE_PRESSED ? true : false, mods);
   }
 }
 
@@ -298,6 +300,10 @@ WaylandDisplay::WaylandDisplay(size_t width, size_t height, size_t width_align, 
       screen_width_align(width_align),
       screen_height_align(height_align),
       xkb_context_(xkb_context_new(XKB_CONTEXT_NO_FLAGS)) {
+#ifdef USE_IARM_BUS
+  uv_rwlock_init(&ir_events_rw_lock_);
+#endif
+
   if (screen_width_ == 0 || screen_height_ == 0) {
     SPDLOG_ERROR("Invalid screen dimensions.");
     return;
@@ -400,6 +406,10 @@ WaylandDisplay::~WaylandDisplay() {
     wl_display_disconnect(display_);
     display_ = nullptr;
   }
+
+#ifdef USE_IARM_BUS
+  uv_rwlock_destroy(&ir_events_rw_lock_);
+#endif
 }
 
 bool WaylandDisplay::IsValid() const {
@@ -412,6 +422,82 @@ void WaylandDisplay::ProcessWaylandEvents(uv_poll_t* handle,
   SPDLOG_TRACE("status = {} events = {}", status, events);
   wl_display_dispatch(display_);
 }
+
+#ifdef USE_IARM_BUS
+void WaylandDisplay::IrHandleKey(int key_code, int key_type, int key_src) {
+  SPDLOG_DEBUG("key_code = {} key_type = {} key_src = {}", key_code, key_type,
+               key_src);
+
+  uint32_t evdev_keycode = irToLinuxEvdevKeycode(key_code);
+  uint32_t xkb_keycode = evdev_keycode + 8;
+  uint32_t utf32 = 0;
+  SimpleKeyboardModifiers mods;
+
+  for (auto listener = kEventListeners.begin();
+       listener != kEventListeners.end(); ++listener) {
+    switch (key_type) {
+      case KET_KEYDOWN:
+        (*listener)->OnKeyboardKey(evdev_keycode, xkb_keycode, utf32, true,
+                                   mods);
+        break;
+      case KET_KEYUP:
+        (*listener)->OnKeyboardKey(evdev_keycode, xkb_keycode, utf32, false,
+                                   mods);
+        break;
+      case KET_KEYREPEAT:
+        (*listener)->OnKeyboardKey(evdev_keycode, xkb_keycode, utf32, false,
+                                   mods);
+        (*listener)->OnKeyboardKey(evdev_keycode, xkb_keycode, utf32, true,
+                                   mods);
+        break;
+
+      default:
+        SPDLOG_ERROR("Unknown key type: {}", key_type);
+        break;
+    }
+  }
+}
+
+void WaylandDisplay::IARMEventHandler(const char* owner,
+                                      IARM_EventId_t eventId,
+                                      void* data,
+                                      size_t len) {
+  if (strcmp(owner, IARM_BUS_IRMGR_NAME) == 0) {
+    switch (eventId) {
+      case IARM_BUS_IRMGR_EVENT_IRKEY:
+        IARM_Bus_IRMgr_EventData_t* event_data =
+            (IARM_Bus_IRMgr_EventData_t*)data;
+        SPDLOG_DEBUG("keyCode = {} keyType = {} keySrc = {}",
+                     event_data->data.irkey.keyCode,
+                     event_data->data.irkey.keyType,
+                     event_data->data.irkey.keySrc);
+
+        uv_rwlock_wrlock(&ir_events_rw_lock_);
+        ir_events_data_vector_.push_back(*event_data);
+        uv_rwlock_wrunlock(&ir_events_rw_lock_);
+
+        uv_async_send(ir_events_async_);
+    }
+  }
+}
+
+void WaylandDisplay::AsyncIARMEventHandler(uv_async_t* handle) {
+  uv_rwlock_wrlock(&ir_events_rw_lock_);
+  std::vector<IARM_Bus_IRMgr_EventData_t> events(ir_events_data_vector_);
+  ir_events_data_vector_.clear();
+  uv_rwlock_wrunlock(&ir_events_rw_lock_);
+
+  while (!events.empty()) {
+    IARM_Bus_IRMgr_EventData_t event_data = events.back();
+    events.pop_back();
+    SPDLOG_DEBUG("keyCode = {} keyType = {} keySrc = {}",
+                 event_data.data.irkey.keyCode, event_data.data.irkey.keyType,
+                 event_data.data.irkey.keySrc);
+    IrHandleKey(event_data.data.irkey.keyCode, event_data.data.irkey.keyType,
+                event_data.data.irkey.keySrc);
+  }
+}
+#endif
 
 bool WaylandDisplay::Run() {
   SPDLOG_DEBUG("valid_ = {}", valid_);
@@ -435,7 +521,28 @@ bool WaylandDisplay::Run() {
                   self->ProcessWaylandEvents(handle, status, events);
                 }));
 
+#ifdef USE_IARM_BUS
+
+  ir_events_async_ = new uv_async_t;
+  uv_async_init(loop, ir_events_async_, cify([self = this](uv_async_t* handle) {
+                  self->AsyncIARMEventHandler(handle);
+                }));
+
+  IARM_Result_t register_result = IARM_Bus_RegisterEventHandler(
+      IARM_BUS_IRMGR_NAME, IARM_BUS_IRMGR_EVENT_IRKEY,
+      cify([self = this](const char* owner, IARM_EventId_t eventId, void* data,
+                         size_t len) {
+        self->IARMEventHandler(owner, eventId, data, len);
+      }));
+  SPDLOG_DEBUG("IARM_Bus_RegisterEventHandler returns {}", register_result);
+#endif
+
   uv_run(loop, UV_RUN_DEFAULT);
+
+#ifdef USE_IARM_BUS
+  uv_close((uv_handle_t*)ir_events_async_, NULL);
+  delete ir_events_async_;
+#endif
 
   uv_timer_stop(key_repeat_timer_handle_);
   delete key_repeat_timer_handle_;
@@ -645,7 +752,8 @@ void WaylandDisplay::AnnounceRegistryInterface(struct wl_registry* wl_registry,
                                                uint32_t name,
                                                const char* interface_name,
                                                uint32_t version) {
-  SPDLOG_DEBUG("name = {} interface_name = {} version = {}", name, interface_name, version);
+  SPDLOG_DEBUG("name = {} interface_name = {} version = {}", name,
+               interface_name, version);
 
   if (strcmp(interface_name, "wl_compositor") == 0) {
     compositor_ = static_cast<decltype(compositor_)>(
