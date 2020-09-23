@@ -99,11 +99,16 @@ static bool Main(std::vector<std::string> args) {
 
   size_t kWidth = 800;
   size_t kHeight = 600;
+  size_t kWidthAlign = 0;
+  size_t kHeightAlign = 0;
 
 #ifdef RDK
   auto screenGeometry = getDisplaySize();
   kWidth = screenGeometry.first;
   kHeight = screenGeometry.second;
+
+  kWidthAlign = 35;
+  kHeightAlign = 23;
 
   SPDLOG_DEBUG("weston display size = {}x{}",
                kWidth, kHeight);
@@ -113,7 +118,7 @@ static bool Main(std::vector<std::string> args) {
     SPDLOG_DEBUG("Arg: {}", arg);
   }
 
-  WaylandDisplay display(kWidth, kHeight);
+  WaylandDisplay display(kWidth, kHeight, kWidthAlign, kHeightAlign);
 
   if (!display.IsValid()) {
     SPDLOG_ERROR("Wayland display was not valid.");
@@ -126,7 +131,7 @@ static bool Main(std::vector<std::string> args) {
     return false;
   }
 
-  if (!application.SetWindowSize(kWidth, kHeight)) {
+  if (!application.SetWindowSize(kWidth - (kWidthAlign * 2), kHeight - (kHeightAlign * 2))) {
     SPDLOG_ERROR("Could not update Flutter application size.");
     return false;
   }
