@@ -27,6 +27,10 @@
 
 #include "GLFW/glfw3.h"
 
+#ifdef USE_IARM_BUS
+#include "iarm.h"
+#endif
+
 namespace flutter {
 
 class SimpleKeyboardModifiers {
@@ -41,11 +45,11 @@ class SimpleKeyboardModifiers {
  public:
   SimpleKeyboardModifiers() {}
   SimpleKeyboardModifiers(bool shift,
-                     bool ctrl,
-                     bool alt,
-                     bool super,
-                     bool caps,
-                     bool num)
+                          bool ctrl,
+                          bool alt,
+                          bool super,
+                          bool caps,
+                          bool num)
       : shift_(shift),
         ctrl_(ctrl),
         alt_(alt),
@@ -73,5 +77,9 @@ class SimpleKeyboardModifiers {
 
 int toGLFWKeyCode(const uint32_t key);
 int toGLFWModifiers(SimpleKeyboardModifiers& mods);
+
+#ifdef USE_IARM_BUS
+uint32_t irToLinuxEvdevKeycode(uint32_t keycode);
+#endif
 
 }  // namespace flutter
