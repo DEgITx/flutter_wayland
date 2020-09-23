@@ -445,12 +445,9 @@ void WaylandDisplay::IrHandleKey(int key_code, int key_type, int key_src) {
                                    mods);
         break;
       case KET_KEYREPEAT:
-        (*listener)->OnKeyboardKey(evdev_keycode, xkb_keycode, utf32, false,
-                                   mods);
         (*listener)->OnKeyboardKey(evdev_keycode, xkb_keycode, utf32, true,
                                    mods);
         break;
-
       default:
         SPDLOG_ERROR("Unknown key type: {}", key_type);
         break;
