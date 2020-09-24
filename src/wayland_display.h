@@ -134,6 +134,9 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate,
   EGLSurface egl_surface_ = nullptr;
   EGLContext egl_context_ = EGL_NO_CONTEXT;
 
+  EGLSurface resource_egl_surface_ = nullptr;
+  EGLContext resource_egl_context_ = EGL_NO_CONTEXT;
+
   wl_keyboard_keymap_format keymap_format_ =
       WL_KEYBOARD_KEYMAP_FORMAT_NO_KEYMAP;
   xkb_state* xkb_state_ = nullptr;
@@ -251,6 +254,8 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate,
 
   // |flutter::FlutterApplication::RenderDelegate|
   uint32_t OnApplicationGetOnscreenFBO() override;
+
+  bool OnApplicationMakeResourceCurrent() override;
 
   FLWAY_DISALLOW_COPY_AND_ASSIGN(WaylandDisplay);
 };
