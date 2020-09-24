@@ -644,11 +644,10 @@ bool WaylandDisplay::SetupEGL() {
   }
 
   // Create an EGL context with the match config.
+  const EGLint ctx_attribs[] = {EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE};
   {
-    const EGLint attribs[] = {EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE};
-
     egl_context_ = eglCreateContext(egl_display_, egl_config,
-                                    nullptr /* share group */, attribs);
+                                    nullptr /* share group */, ctx_attribs);
 
     if (egl_context_ == EGL_NO_CONTEXT) {
       LogLastEGLError();
@@ -656,6 +655,17 @@ bool WaylandDisplay::SetupEGL() {
       return false;
     }
   }
+
+  const EGLint pbuffer_config_attribs[] = {
+      EGL_HEIGHT, 64,
+      EGL_WIDTH, 64,
+      EGL_NONE
+  };
+
+  resource_egl_context_ = eglCreateContext(egl_display_, egl_config, egl_context_ /* share group */, ctx_attribs);
+  resource_egl_surface_ = eglCreatePbufferSurface(egl_display_, egl_config, pbuffer_config_attribs);
+
+  SPDLOG_DEBUG("created egl resource surface = {} with context = {}", fmt::ptr(resource_egl_surface_), fmt::ptr(resource_egl_context_));
 
   wl_egl_window_resize(window_, screen_width_ - (screen_width_align * 2),
                        screen_height_ - (screen_height_align * 2),
@@ -772,6 +782,16 @@ uint32_t WaylandDisplay::OnApplicationGetOnscreenFBO() {
   }
 
   return 0;  // FBO0
+}
+
+bool WaylandDisplay::OnApplicationMakeResourceCurrent() {
+  if (eglMakeCurrent(egl_display_, resource_egl_surface_, resource_egl_surface_, resource_egl_context_) != EGL_TRUE) {
+    LogLastEGLError();
+    SPDLOG_ERROR("Could not make the RESOURCE context current");
+    return false;
+  }
+
+  return true;
 }
 
 }  // namespace flutter

@@ -87,6 +87,10 @@ FlutterApplication::FlutterApplication(
         name);
     return nullptr;
   };
+  config.open_gl.make_resource_current = [](void* userdata) -> bool {
+    return reinterpret_cast<FlutterApplication*>(userdata)
+        ->render_delegate_.OnApplicationMakeResourceCurrent();
+  };
 
   auto icu_data_path = GetICUDataPath();
 
