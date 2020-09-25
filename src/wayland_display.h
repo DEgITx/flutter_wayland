@@ -17,6 +17,10 @@
 #include "iarm.h"
 #endif
 
+#ifdef USE_COMPOSITOR_LAYOUT
+#include <weston-nsc-backend/settop-shell-client-protocol.h>
+#endif
+
 #include <memory>
 #include <set>
 #include <string>
@@ -32,7 +36,10 @@ namespace flutter {
 class WaylandDisplay : public FlutterApplication::RenderDelegate,
                        public FlutterApplication::EventEmitter {
  public:
-  WaylandDisplay(size_t width, size_t height, size_t widthAlign, size_t heightAlign);
+  WaylandDisplay(size_t width,
+                 size_t height,
+                 size_t widthAlign,
+                 size_t heightAlign);
 
   ~WaylandDisplay();
 
@@ -41,7 +48,6 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate,
   bool Run();
 
  private:
-
   enum InputSource {
     INPUT_SOURCE_KEYBOARD,
 #ifdef USE_IARM_BUS
@@ -113,6 +119,44 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate,
         self->KeyboardHandleRepeatInfo(data, wl_keyboard, rate, delay);
       }),
   };
+#ifdef USE_COMPOSITOR_LAYOUT
+  const compositor_layout_listener kCompositorLayoutListener = {
+      .client_created =
+          cify([self = this](void* data,
+                             struct compositor_layout* compositor_layout,
+                             uint32_t pid,
+                             uint32_t surface) {
+            SPDLOG_DEBUG("client_created: pid:surface = {}:{}", pid, surface);
+            compositor_layout_set_focus(compositor_layout, surface);
+          }),
+      .client_destroyed =
+          cify([self = this](void* data,
+                             struct compositor_layout* compositor_layout,
+                             uint32_t surface) {
+            SPDLOG_DEBUG("client_destroyed: surface = {}", surface);
+          }),
+      .key_event =
+          cify([self = this](void* data,
+                             struct compositor_layout* compositor_layout,
+                             uint32_t keyCode) {
+            SPDLOG_DEBUG("key_event: keyCode = {}", keyCode);
+          }),
+      .touch_event =
+          cify([self = this](void* data,
+                             struct compositor_layout* compositor_layout) {
+            SPDLOG_DEBUG("touch_event: no params");
+          }),
+      .size_event =
+          cify([self = this](void* data,
+                             struct compositor_layout* compositor_layout,
+                             uint32_t surface,
+                             uint32_t width,
+                             uint32_t height) {
+            SPDLOG_DEBUG("key_event: surface = {} width = {} height = {}",
+                         surface, width, height);
+          }),
+  };
+#endif
   bool valid_ = false;
   const int screen_width_;
   const int screen_height_;
@@ -134,6 +178,7 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate,
   EGLSurface egl_surface_ = nullptr;
   EGLContext egl_context_ = EGL_NO_CONTEXT;
 
+  bool xkb_input_source_enabled_ = false;
   wl_keyboard_keymap_format keymap_format_ =
       WL_KEYBOARD_KEYMAP_FORMAT_NO_KEYMAP;
   xkb_state* xkb_state_ = nullptr;
@@ -148,7 +193,12 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate,
   uint64_t repeat_delay_ = 400;  // in milliseconds
   uv_timer_t* key_repeat_timer_handle_ = nullptr;
 
+#ifdef USE_COMPOSITOR_LAYOUT
+  compositor_layout* compositor_layout_ = nullptr;
+#endif
+
 #ifdef USE_IARM_BUS
+  bool ir_input_source_enabled_ = false;
   uv_async_t* ir_events_async_;
   uv_rwlock_t ir_events_rw_lock_;
   std::vector<IARM_Bus_IRMgr_EventData_t> ir_events_data_vector_;
