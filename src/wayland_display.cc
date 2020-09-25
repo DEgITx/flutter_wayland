@@ -308,7 +308,9 @@ const wl_shell_surface_listener WaylandDisplay::kShellSurfaceListener = {
                     uint32_t edges,
                     int32_t width,
                     int32_t height) -> void {
-      SPDLOG_ERROR("Unhandled resize.");
+      SPDLOG_DEBUG(
+          "kShellSurfaceListener.configure: edges = {} width = {} height = {}",
+          edges, width, height);
     },
 
     .popup_done = [](void* data,

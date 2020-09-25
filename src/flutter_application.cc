@@ -76,7 +76,9 @@ FlutterApplication::FlutterApplication(
     if (address != nullptr) {
       return reinterpret_cast<void*>(address);
     }
-    SPDLOG_ERROR("Tried unsuccessfully to resolve: {}", name);
+    SPDLOG_ERROR(
+        "config.open_gl.gl_proc_resolver: Tried unsuccessfully to resolve: {}",
+        name);
     return nullptr;
   };
 
