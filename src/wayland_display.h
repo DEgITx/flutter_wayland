@@ -126,25 +126,29 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate,
                              struct compositor_layout* compositor_layout,
                              uint32_t pid,
                              uint32_t surface) {
-            SPDLOG_DEBUG("client_created: pid:surface = {}:{}", pid, surface);
+            SPDLOG_DEBUG(
+                "kCompositorLayoutListener.client_created: pid:surface = {}:{}",
+                pid, surface);
             compositor_layout_set_focus(compositor_layout, surface);
           }),
-      .client_destroyed =
-          cify([self = this](void* data,
-                             struct compositor_layout* compositor_layout,
-                             uint32_t surface) {
-            SPDLOG_DEBUG("client_destroyed: surface = {}", surface);
-          }),
+      .client_destroyed = cify([self = this](
+                                   void* data,
+                                   struct compositor_layout* compositor_layout,
+                                   uint32_t surface) {
+        SPDLOG_DEBUG("kCompositorLayoutListener.client_destroyed: surface = {}",
+                     surface);
+      }),
       .key_event =
           cify([self = this](void* data,
                              struct compositor_layout* compositor_layout,
                              uint32_t keyCode) {
-            SPDLOG_DEBUG("key_event: keyCode = {}", keyCode);
+            SPDLOG_DEBUG("kCompositorLayoutListener.key_event: keyCode = {}",
+                         keyCode);
           }),
       .touch_event =
           cify([self = this](void* data,
                              struct compositor_layout* compositor_layout) {
-            SPDLOG_DEBUG("touch_event: no params");
+            SPDLOG_DEBUG("kCompositorLayoutListener.touch_event: no params");
           }),
       .size_event =
           cify([self = this](void* data,
@@ -152,8 +156,10 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate,
                              uint32_t surface,
                              uint32_t width,
                              uint32_t height) {
-            SPDLOG_DEBUG("key_event: surface = {} width = {} height = {}",
-                         surface, width, height);
+            SPDLOG_DEBUG(
+                "kCompositorLayoutListener.size_event: surface = {} width = {} "
+                "height = {}",
+                surface, width, height);
           }),
   };
 #endif
