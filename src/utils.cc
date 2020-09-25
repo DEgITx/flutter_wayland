@@ -68,7 +68,7 @@ bool FlutterAssetBundleIsValid(const std::string& bundle_path) {
 }
 
 std::string FlutterGetAppAotElfName() {
-  return std::string("app-aot-elf.so"); // dw: TODO: There seems to be no convention name we could use, so let's temporary hardcode the file name.
+  return std::string("../../lib/libapp.so"); // assumes 'flutter build' directory layout
 }
 
 }  // namespace flutter
