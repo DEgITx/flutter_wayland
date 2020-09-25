@@ -117,8 +117,13 @@ void WaylandDisplay::KeyboardHandleKey(void* data,
                                        uint32_t time,
                                        uint32_t key,
                                        uint32_t state) {
-  SPDLOG_DEBUG("key = {} state = {} keymap_format_ = {}", key, state,
-               keymap_format_);
+  SPDLOG_DEBUG(
+      "key = {} state = {} keymap_format_ = {} xkb_input_source_enabled_ = {}",
+      key, state, keymap_format_, xkb_input_source_enabled_);
+
+  if (!xkb_input_source_enabled_) {
+    return;
+  }
 
   uint32_t evdev_keycode = key;
   uint32_t xkb_keycode;
@@ -321,7 +326,18 @@ WaylandDisplay::WaylandDisplay(size_t width,
       screen_width_align(width_align),
       screen_height_align(height_align),
       xkb_context_(xkb_context_new(XKB_CONTEXT_NO_FLAGS)) {
+#ifdef USE_XKB_INPUT
+  xkb_input_source_enabled_ = true;
+#else
+  xkb_input_source_enabled_ = false;
+#endif
+
 #ifdef USE_IARM_BUS
+#ifdef USE_IARM_INPUT
+  ir_input_source_enabled_ = true;
+#else
+  ir_input_source_enabled_ = false;
+#endif
   uv_rwlock_init(&ir_events_rw_lock_);
 #endif
 
@@ -392,6 +408,13 @@ WaylandDisplay::~WaylandDisplay() {
   }
 #endif
 
+#ifdef USE_COMPOSITOR_LAYOUT
+  if (compositor_layout_) {
+    compositor_layout_destroy(compositor_layout_);
+    compositor_layout_ = nullptr;
+  }
+#endif
+
   if (egl_surface_) {
     eglDestroySurface(egl_display_, egl_surface_);
     egl_surface_ = nullptr;
@@ -446,8 +469,13 @@ void WaylandDisplay::ProcessWaylandEvents(uv_poll_t* handle,
 
 #ifdef USE_IARM_BUS
 void WaylandDisplay::IrHandleKey(int key_code, int key_type, int key_src) {
-  SPDLOG_TRACE("key_code = {} key_type = {} key_src = {}", key_code, key_type,
-               key_src);
+  SPDLOG_TRACE(
+      "key_code = {} key_type = {} key_src = {} ir_input_source_enabled_ = {}",
+      key_code, key_type, key_src, ir_input_source_enabled_);
+
+  if (!ir_input_source_enabled_) {
+    return;
+  }
 
   uint32_t evdev_keycode = irToLinuxEvdevKeycode(key_code);
   uint32_t xkb_keycode = evdev_keycode + 8;
@@ -819,6 +847,17 @@ void WaylandDisplay::AnnounceRegistryInterface(struct wl_registry* wl_registry,
     wl_seat_add_listener(seat_, &kSeatListener, NULL);
     return;
   }
+
+#ifdef USE_COMPOSITOR_LAYOUT
+  if (strcmp(interface_name, "compositor_layout") == 0) {
+    compositor_layout_ = static_cast<decltype(compositor_layout_)>(
+        wl_registry_bind(wl_registry, name, &compositor_layout_interface, 1));
+    compositor_layout_register_manager(compositor_layout_);
+    compositor_layout_add_listener(compositor_layout_,
+                                   &kCompositorLayoutListener, NULL);
+    return;
+  }
+#endif
 }
 
 void WaylandDisplay::UnannounceRegistryInterface(

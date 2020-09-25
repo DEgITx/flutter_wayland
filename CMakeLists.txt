@@ -16,6 +16,7 @@ set(CMAKE_CXX_STANDARD 14)
 include(DownloadProject/DownloadProject.cmake)
 
 option(WITH_XDG_SHELL "Use xdg-shell protocol extension" OFF)
+option(WITH_IARM_INPUT "Use RCU input from IARM bus" OFF)
 
 find_package(PkgConfig)
 pkg_check_modules(WAYLAND_CLIENT REQUIRED wayland-client)
@@ -84,6 +85,14 @@ if(RDK)
   add_definitions(-DUSE_IARM_BUS)
   set(IARM_LIBRARIES ${IARM_LIBRARIES} IARMBus)
   set(IARM_INCLUDE_DIRS ${IARM_INCLUDE_PATHS} ${CMAKE_SYSROOT}/usr/include/rdk/iarmbus ${CMAKE_SYSROOT}/usr/include/rdk/iarmmgrs-hal)
+  add_definitions(-DUSE_COMPOSITOR_LAYOUT)
+endif()
+
+# Select input source
+if(LIBERTY AND WITH_IARM_INPUT)
+  add_definitions(-DUSE_IARM_INPUT)
+else()
+  add_definitions(-DUSE_XKB_INPUT)
 endif()
 
 set(FLUTTER_PATH "" CACHE STRING "Flutter Engine path")
