@@ -80,12 +80,16 @@ if(WITH_XDG_SHELL)
 endif()
 
 if(RDK)
+  option(RDK_EMBEDDED "Change assert path to support RDK default asserts and stuffs" OFF)
   add_definitions(-DGLFW_INCLUDE_ES1 -DRDK)
   set(WAYLAND_EGL_LIBRARIES ${WAYLAND_EGL_LIBRARIES} nxpl display_manager)
   add_definitions(-DUSE_IARM_BUS)
   set(IARM_LIBRARIES ${IARM_LIBRARIES} IARMBus)
   set(IARM_INCLUDE_DIRS ${IARM_INCLUDE_PATHS} ${CMAKE_SYSROOT}/usr/include/rdk/iarmbus ${CMAKE_SYSROOT}/usr/include/rdk/iarmmgrs-hal)
   add_definitions(-DUSE_COMPOSITOR_LAYOUT)
+  if(RDK_EMBEDDED)
+    add_definitions(-DRDK_EMBEDDED)
+  endif()
 endif()
 
 # Select input source
