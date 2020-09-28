@@ -189,57 +189,14 @@ int toGLFWModifiers(SimpleKeyboardModifiers& mods) {
 // }
 
 #ifdef USE_IARM_BUS
-struct irKeyLutEntry {
-  uint32_t irCode;
-  uint32_t evdevCode;
-};
-
-static const irKeyLutEntry irKeyTable[] = {
-    {KED_POWER, KEY_POWER},
-    {KED_CHANNELUP, KEY_NEXTSONG},
-    {KED_CHANNELDOWN, KEY_PREVIOUSSONG},
-    {KED_ARROWLEFT, KEY_LEFT},
-    {KED_ARROWRIGHT, KEY_RIGHT},
-    {KED_ARROWUP, KEY_UP},
-    {KED_ARROWDOWN, KEY_DOWN},
-    {KED_SELECT, KEY_ENTER},
-    {KED_PLAY, KEY_PLAYPAUSE},
-    {KED_STOP, KEY_STOP},
-    {KED_FASTFORWARD, KEY_FORWARD},
-    {KED_REWIND, KEY_REWIND},
-    {KED_VOLUMEUP, KEY_VOLUMEUP},
-    {KED_VOLUMEDOWN, KEY_VOLUMEDOWN},
-    {KED_MUTE, KEY_MUTE},
-    {KED_RECORD, KEY_F13},
-    {KED_MYDVR, KEY_F14},
-    {KED_ONDEMAND, KEY_COFFEE},
-    {KED_MENU, KEY_HOME},           // MENU
-    {KED_INFO, KEY_F15},            // INFO
-    {KED_GUIDE, KEY_F16},           // GUIDE
-    {KED_PAGEDOWN, KEY_BACKSPACE},  // BACK
-    {KED_LAST, KEY_ESC},            // BACK
-    {KED_KEYC, KEY_F18},            // RED
-    {KED_KEYD, KEY_F19},            // GREEN
-    {KED_KEYA, KEY_F20},            // YELLOW
-    {KED_KEYB, KEY_F21},            // BLUE
-    {KED_DIGIT0, KEY_0},
-    {KED_DIGIT1, KEY_1},
-    {KED_DIGIT2, KEY_2},
-    {KED_DIGIT3, KEY_3},
-    {KED_DIGIT4, KEY_4},
-    {KED_DIGIT5, KEY_5},
-    {KED_DIGIT6, KEY_6},
-    {KED_DIGIT7, KEY_7},
-    {KED_DIGIT8, KEY_8},
-    {KED_DIGIT9, KEY_9}};
-
-static size_t irKeyTableSize = sizeof(irKeyTable) / sizeof(irKeyTable[0]);
-
 uint32_t irToLinuxEvdevKeycode(uint32_t keycode) {
   size_t i;
-  for (i = 0; i < irKeyTableSize; i++) {
-    if (irKeyTable[i].irCode == keycode) {
-      return irKeyTable[i].evdevCode;
+
+  for (i = 0;
+       i < (sizeof(kcodesMap_IARM2Linux) / sizeof(kcodesMap_IARM2Linux[0]));
+       i++) {
+    if (kcodesMap_IARM2Linux[i].iCode == keycode) {
+      return kcodesMap_IARM2Linux[i].uCode;
     }
   }
 

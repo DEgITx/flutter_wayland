@@ -117,7 +117,7 @@ void WaylandDisplay::KeyboardHandleKey(void* data,
                                        uint32_t time,
                                        uint32_t key,
                                        uint32_t state) {
-  SPDLOG_DEBUG(
+  SPDLOG_TRACE(
       "key = {} state = {} keymap_format_ = {} xkb_input_source_enabled_ = {}",
       key, state, keymap_format_, xkb_input_source_enabled_);
 
