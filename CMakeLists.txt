@@ -16,7 +16,7 @@ set(CMAKE_CXX_STANDARD 14)
 include(DownloadProject/DownloadProject.cmake)
 
 option(WITH_XDG_SHELL "Use xdg-shell protocol extension" OFF)
-option(WITH_IARM_INPUT "Use RCU input from IARM bus" OFF)
+option(WITH_IARM_INPUT "Use RCU input from IARM bus" ON)
 
 find_package(PkgConfig)
 pkg_check_modules(WAYLAND_CLIENT REQUIRED wayland-client)
