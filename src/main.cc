@@ -83,6 +83,7 @@ static std::pair<unsigned int, unsigned int> getDisplaySize() {
 #endif
 
 static bool Main(std::vector<std::string> args) {
+#ifndef RDK_EMBEDDED
   if (args.size() == 0) {
     std::cerr << "   <Invalid Arguments>   " << std::endl;
     PrintUsage();
@@ -90,6 +91,9 @@ static bool Main(std::vector<std::string> args) {
   }
 
   const auto asset_bundle_path = args[0];
+#else
+  const auto asset_bundle_path = "/usr/share/flutter/flutter_assets";
+#endif
 
   if (!FlutterAssetBundleIsValid(asset_bundle_path)) {
     std::cerr << "   <Invalid Flutter Asset Bundle>   " << std::endl;

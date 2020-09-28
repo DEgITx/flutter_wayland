@@ -21,10 +21,14 @@ static_assert(FLUTTER_ENGINE_VERSION == 1, "");
 static const char* kICUDataFileName = "icudtl.dat";
 
 static std::string GetICUDataPath() {
+#ifndef RDK_EMBEDDED
   auto exe_dir = GetExecutableDirectory();
   if (exe_dir == "") {
     return "";
   }
+#else
+  auto exe_dir = "/usr/share/flutter/";
+#endif
   std::stringstream stream;
   stream << exe_dir << kICUDataFileName;
 
