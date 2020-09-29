@@ -120,9 +120,15 @@ endif()
 
 link_directories(${CMAKE_BINARY_DIR})
 
-add_executable(flutter_wayland ${FLUTTER_WAYLAND_SRC})
+if(RDK_EMBEDDED)
+  set(FLUTTER_BINARY_NAME flutter)
+else()
+  set(FLUTTER_BINARY_NAME flutter_wayland)
+endif()
 
-target_link_libraries(flutter_wayland
+add_executable(${FLUTTER_BINARY_NAME} ${FLUTTER_WAYLAND_SRC})
+
+target_link_libraries(${FLUTTER_BINARY_NAME}
   spdlog::spdlog
   nlohmann_json::nlohmann_json
   uv_a
@@ -134,7 +140,7 @@ target_link_libraries(flutter_wayland
   ${IARM_LIBRARIES}
 )
 
-target_include_directories(flutter_wayland
+target_include_directories(${FLUTTER_BINARY_NAME}
   PRIVATE
   ${WAYLAND_CLIENT_INCLUDE_DIRS}
   ${WAYLAND_EGL_INCLUDE_DIRS}
