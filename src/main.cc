@@ -111,8 +111,10 @@ static bool Main(std::vector<std::string> args) {
   kWidth = screenGeometry.first;
   kHeight = screenGeometry.second;
 
+#ifdef RDK_WINDOW_ALIGN
   kWidthAlign = 35;
   kHeightAlign = 23;
+#endif
 
   SPDLOG_DEBUG("weston display size = {}x{}",
                kWidth, kHeight);
