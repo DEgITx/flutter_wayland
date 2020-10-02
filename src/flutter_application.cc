@@ -108,6 +108,62 @@ FlutterApplication::FlutterApplication(
   args.command_line_argc = static_cast<int>(command_line_args_c.size());
   args.command_line_argv = command_line_args_c.data();
 
+  FlutterTaskRunnerDescription platformTaskRunnerDescription = {0};
+  platformTaskRunnerDescription.struct_size = sizeof(FlutterTaskRunnerDescription);
+  platformTaskRunnerDescription.identifier = 1;
+  platformTaskRunnerDescription.user_data = this;
+  platformTaskRunnerDescription.post_task_callback = [] (FlutterTask task,
+                                                         uint64_t target_time_ns,
+                                                         void* user_data) -> void {
+      FlutterApplication *app = reinterpret_cast<FlutterApplication*>(user_data);
+      FlutterEngineRunTask(app->getEngine(), &task);
+  };
+  platformTaskRunnerDescription.runs_task_on_current_thread_callback = [] (void* user_data) -> bool {
+      return true;
+  };
+
+  FlutterTaskRunnerDescription renderTaskRunnerDescription = {0};
+  renderTaskRunnerDescription.struct_size = sizeof(FlutterTaskRunnerDescription);
+  renderTaskRunnerDescription.identifier = 1;
+  renderTaskRunnerDescription.user_data = this;
+  renderTaskRunnerDescription.post_task_callback = [] (FlutterTask task,
+                                                       uint64_t target_time_ns,
+                                                       void* user_data) -> void {
+      FlutterApplication *app = reinterpret_cast<FlutterApplication*>(user_data);
+      FlutterEngineRunTask(app->getEngine(), &task);
+  };
+  renderTaskRunnerDescription.runs_task_on_current_thread_callback = [] (void* user_data) -> bool {
+      return true;
+  };
+
+  FlutterCustomTaskRunners customTaskRunners = {
+    .struct_size = sizeof(FlutterCustomTaskRunners),
+    .platform_task_runner = &platformTaskRunnerDescription,
+    .render_task_runner = &renderTaskRunnerDescription,
+  };
+
+  args.custom_task_runners = &customTaskRunners;
+
+  args.platform_message_callback = [] (const FlutterPlatformMessage* message,
+                                       void* user_data) -> void {
+    if (std::strcmp(message->channel, "flutter/dshal") == 0) {
+      char text[32];
+      strncpy(text, reinterpret_cast<const char*>(message->message), message->message_size);
+      text[message->message_size]=0x00;
+      SPDLOG_DEBUG("platform_message_callback: channel = {} message = {} message_size = {}",
+                    message->channel, text, message->message_size);
+
+      // TODO: change flutter app window size
+    }
+    if (message->response_handle != nullptr) {
+      // send null for now
+      FlutterEngineResult result =
+        FlutterEngineSendPlatformMessageResponse(
+          reinterpret_cast<FlutterApplication*>(user_data)->engine_,
+          message->response_handle, nullptr, 0);
+    }
+  };
+
   auto result = FlutterEngineRun(FLUTTER_ENGINE_VERSION, &config, &args,
                                  this /* userdata */, &engine_);
 
@@ -133,6 +189,10 @@ FlutterApplication::~FlutterApplication() {
   if (result != kSuccess) {
     SPDLOG_ERROR("Could not shutdown the Flutter engine.");
   }
+}
+
+FlutterEngine FlutterApplication::getEngine() const {
+  return engine_;
 }
 
 bool FlutterApplication::IsValid() const {

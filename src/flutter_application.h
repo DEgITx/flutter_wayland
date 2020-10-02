@@ -64,6 +64,8 @@ class FlutterApplication {
 
   bool SendPointerEvent(int button, int x, int y);
 
+  FlutterEngine getEngine() const;
+
  private:
   class DisplayEventListener : public EventListener {
     FlutterApplication* parent;
