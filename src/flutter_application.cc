@@ -144,7 +144,7 @@ bool FlutterApplication::SetWindowSize(size_t width, size_t height) {
   event.struct_size = sizeof(event);
   event.width = width;
   event.height = height;
-  event.pixel_ratio = 1.0;
+  event.pixel_ratio = 2.0; // TODO: calculate this
   return FlutterEngineSendWindowMetricsEvent(engine_, &event) == kSuccess;
 }
 
