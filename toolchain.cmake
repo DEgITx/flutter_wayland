@@ -1,7 +1,7 @@
 set(CMAKE_SYSTEM_NAME Linux)
 set(CMAKE_SYSTEM_PROCESSOR arm)
 
-set(RDK_BUILD_DIR /home/deg/Projects/zodiac_apollo/onemw/build-brcm972554pck-refboard)
+set(RDK_BUILD_DIR /home/user/builddir)
 set(RDK_TARGET_PLATFORM apollo)
 
 set(CMAKE_SYSROOT ${RDK_BUILD_DIR}/tmp/sysroots/${RDK_TARGET_PLATFORM}-debug)
