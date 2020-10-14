@@ -22,10 +22,11 @@
 
 #pragma once
 
-#include <stdint.h>
+#include <xkbcommon/xkbcommon.h>
+#include <gdk/gdk.h>
 
 namespace flutter {
 
-int toGLFWKeyCode(const uint32_t key);
+GdkModifierType toGDKModifiers(struct xkb_keymap *xkb_keymap, guint32 mods);
 
 } // namespace flutter

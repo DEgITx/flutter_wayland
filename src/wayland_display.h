@@ -8,6 +8,7 @@
 #include <EGL/egl.h>
 #include <wayland-client.h>
 #include <wayland-egl.h>
+#include <gdk/gdk.h>
 #include <xkbcommon/xkbcommon.h>
 #include <flutter_embedder.h>
 
@@ -44,6 +45,7 @@ private:
   struct xkb_state *xkb_state             = nullptr;
   struct xkb_keymap *keymap               = nullptr;
   struct xkb_context *xkb_context         = nullptr;
+  GdkModifierType key_modifiers           = static_cast<GdkModifierType>(0);
 
   bool valid_ = false;
   int screen_width_;

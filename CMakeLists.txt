@@ -7,11 +7,11 @@ cmake_minimum_required(VERSION 3.3)
 project(flutter-launcher-wayland)
 
 find_package(PkgConfig)
-pkg_search_module(GLFW glfw3 REQUIRED) # dw: Not used for linking, we just need an access to the header
 pkg_search_module(XKB xkbcommon REQUIRED)
 pkg_search_module(EGL egl REQUIRED)
 pkg_search_module(WAYLAND_CLIENT wayland-client REQUIRED)
 pkg_search_module(WAYLAND_EGL wayland-egl REQUIRED)
+pkg_search_module(GDK gdk-3.0 REQUIRED) # dw: Not used for linking, we just need an access to the header
 # If you do not have flutter-engine.pc file
 # just provide all FLUTTER_ENGINE* variables using -D
 pkg_search_module(FLUTTER_ENGINE flutter-engine)
@@ -56,6 +56,7 @@ target_include_directories(flutter-launcher-wayland
   ${EGL_INCLUDE_DIRS}
   ${WAYLAND_CLIENT_INCLUDE_DIRS}
   ${WAYLAND_EGL_INCLUDE_DIRS}
+  ${GDK_INCLUDE_DIRS}
   ${FLUTTER_ENGINE_INCLUDE_DIRS}
 )
 

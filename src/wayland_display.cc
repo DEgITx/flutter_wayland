@@ -100,7 +100,12 @@ const wl_shell_surface_listener WaylandDisplay::kShellSurfaceListener = {
 const wl_pointer_listener WaylandDisplay::kPointerListener = {
     .enter = [](void *data, struct wl_pointer *wl_pointer, uint32_t serial, struct wl_surface *surface, wl_fixed_t surface_x, wl_fixed_t surface_y) {},
 
-    .leave = [](void *data, struct wl_pointer *wl_pointer, uint32_t serial, struct wl_surface *surface) {},
+    .leave =
+        [](void *data, struct wl_pointer *wl_pointer, uint32_t serial, struct wl_surface *surface) {
+          WaylandDisplay *const wd = DISPLAY;
+          assert(wd);
+          wd->key_modifiers = static_cast<GdkModifierType>(0);
+        },
 
     .motion =
         [](void *data, struct wl_pointer *wl_pointer, uint32_t time, wl_fixed_t surface_x, wl_fixed_t surface_y) {
@@ -169,29 +174,65 @@ const wl_keyboard_listener WaylandDisplay::kKeyboardListener = {
     .leave = [](void *data, struct wl_keyboard *wl_keyboard, uint32_t serial, struct wl_surface *surface) { printf("keyboard leave\n"); },
 
     .key =
-        [](void *data, struct wl_keyboard *wl_keyboard, uint32_t serial, uint32_t time, uint32_t key, uint32_t state) {
+        [](void *data, struct wl_keyboard *wl_keyboard, uint32_t serial, uint32_t time, uint32_t key, uint32_t state_w) {
           WaylandDisplay *const wd = DISPLAY;
           assert(wd);
 
           if (wd->keymap_format == WL_KEYBOARD_KEYMAP_FORMAT_NO_KEYMAP) {
-            printf("Hmm - no keymap, no key\n");
+            printf("Hmm - no keymap, no key event\n");
             return;
           }
 
-          xkb_keysym_t keysym = xkb_state_key_get_one_sym(wd->xkb_state, key + (wd->keymap_format * 8));
-          uint32_t utf32      = xkb_keysym_to_utf32(keysym);
+          const xkb_keycode_t hardware_keycode = key + (wd->keymap_format * 8);
+          const xkb_keysym_t keysym            = xkb_state_key_get_one_sym(wd->xkb_state, hardware_keycode);
+
+          if (keysym == XKB_KEY_NoSymbol) {
+            printf("Hmm - no key symbol, no key event\n");
+            return;
+          }
+
+          xkb_mod_mask_t mods = xkb_state_serialize_mods(wd->xkb_state, XKB_STATE_MODS_EFFECTIVE);
+          wd->key_modifiers   = toGDKModifiers(wd->keymap, mods);
+
+          // Remove lock states from state mask.
+          guint state = wd->key_modifiers & ~(GDK_LOCK_MASK | GDK_MOD2_MASK);
+
+          static bool shift_lock_pressed = false;
+          static bool caps_lock_pressed  = false;
+          static bool num_lock_pressed   = false;
+
+          const GdkEventType type = state_w == WL_KEYBOARD_KEY_STATE_PRESSED ? GDK_KEY_PRESS : GDK_KEY_RELEASE;
+
+          switch (keysym) {
+          case GDK_KEY_Num_Lock:
+            num_lock_pressed = type == GDK_KEY_PRESS;
+            break;
+          case GDK_KEY_Caps_Lock:
+            caps_lock_pressed = type == GDK_KEY_PRESS;
+            break;
+          case GDK_KEY_Shift_Lock:
+            shift_lock_pressed = type == GDK_KEY_PRESS;
+            break;
+          }
+
+          // Add back in the state matching the actual pressed state of the lock keys,
+          // not the lock states.
+          state |= (shift_lock_pressed || caps_lock_pressed) ? GDK_LOCK_MASK : 0x0;
+          state |= num_lock_pressed ? GDK_MOD2_MASK : 0x0;
+
+          uint32_t utf32 = xkb_keysym_to_utf32(keysym);
 
           if (utf32) {
             if (utf32 >= 0x21 && utf32 <= 0x7E) {
-              printf("the key %c was pressed\n", (char)utf32);
+              printf("the key %c was %s\n", (char)utf32, type == GDK_KEY_PRESS ? "pressed" : "released");
             } else {
-              printf("the key U+%04X was pressed\n", utf32);
+              printf("the key U+%04X was %s\n", utf32, type == GDK_KEY_PRESS ? "pressed" : "released");
             }
           } else {
             char name[64];
             xkb_keysym_get_name(keysym, name, sizeof(name));
 
-            printf("the key %s was %s\n", name, state == WL_KEYBOARD_KEY_STATE_PRESSED ? "pressed" : "released");
+            printf("the key %s was %s\n", name, type == GDK_KEY_PRESS ? "pressed" : "released");
           }
 
           std::string message;
@@ -199,19 +240,16 @@ const wl_keyboard_listener WaylandDisplay::kKeyboardListener = {
           // dw: if you do not like so many backslashes,
           // please consider to rerwite it using RapidJson.
           message += "{";
-          message += "\"keyCode\":" + std::to_string(toGLFWKeyCode(key));
-          message += ",\"keymap\":\"linux\"";
-          message += ",\"scanCode\":" + std::to_string(key);
-          message += ",\"modifiers\":0";      // dw TODO: not implemented
-          message += ",\"toolkit\":\"glfw\""; // dw: why they choose to use "glfw" toolkit?
-          message += ",\"type\":\"";
+          message += " \"type\":" + std::string(type == GDK_KEY_PRESS ? "\"keydown\"" : "\"keyup\"");
+          message += ",\"keymap\":" + std::string("\"linux\"");
+          message += ",\"scanCode\":" + std::to_string(hardware_keycode);
+          message += ",\"toolkit\":" + std::string("\"gtk\"");
+          message += ",\"keyCode\":" + std::to_string(keysym);
+          message += ",\"modifiers\":" + std::to_string(state);
+          if (utf32) {
+            message += ",\"unicodeScalarValues\":" + std::to_string(utf32);
+          }
 
-          if (state == WL_KEYBOARD_KEY_STATE_PRESSED)
-            message += "keydown";
-          else
-            message += "keyup";
-
-          message += "\"";
           message += "}";
 
           if (!message.empty()) {
@@ -228,7 +266,7 @@ const wl_keyboard_listener WaylandDisplay::kKeyboardListener = {
           WaylandDisplay *const wd = DISPLAY;
           assert(wd);
 
-          xkb_state_update_mask(wd->xkb_state, mods_depressed, mods_latched, mods_locked, 0, 0, group);
+          xkb_state_update_mask(wd->xkb_state, mods_depressed, mods_latched, mods_locked, group, 0, 0);
         },
 
     .repeat_info = [](void *data, struct wl_keyboard *wl_keyboard, int32_t rate, int32_t delay) {},
