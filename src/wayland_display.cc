@@ -220,7 +220,7 @@ const wl_keyboard_listener WaylandDisplay::kKeyboardListener = {
           state |= (shift_lock_pressed || caps_lock_pressed) ? GDK_LOCK_MASK : 0x0;
           state |= num_lock_pressed ? GDK_MOD2_MASK : 0x0;
 
-          uint32_t utf32 = xkb_keysym_to_utf32(keysym);
+          const uint32_t utf32 = xkb_keysym_to_utf32(keysym); // TODO: double check if it fully mimics gdk_keyval_to_unicode()
 
           if (utf32) {
             if (utf32 >= 0x21 && utf32 <= 0x7E) {
