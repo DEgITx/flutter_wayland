@@ -16,4 +16,6 @@ bool FileExistsAtPath(const std::string& path);
 
 bool FlutterAssetBundleIsValid(const std::string& bundle_path);
 
-}  // namespace flutter
+std::string FlutterGetAppAotElfName();
+
+} // namespace flutter

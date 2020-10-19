@@ -54,12 +54,21 @@ bool FlutterAssetBundleIsValid(const std::string& bundle_path) {
     return false;
   }
 
-  if (!FileExistsAtPath(bundle_path + std::string{"/kernel_blob.bin"})) {
-    SPDLOG_ERROR("Kernel blob does not exist.");
+  auto kernel_path = bundle_path + std::string{"/kernel_blob.bin"};
+  auto aotelf_path = bundle_path + std::string{"/"} + FlutterGetAppAotElfName();
+  auto kernel      = FileExistsAtPath(kernel_path);
+  auto aotelf      = FileExistsAtPath(aotelf_path);
+
+  if (!(kernel || aotelf)) {
+    SPDLOG_ERROR("Kernel blob does not exist. kernel = {} aotelf = {}", kernel, aotelf);
     return false;
   }
 
   return true;
+}
+
+std::string FlutterGetAppAotElfName() {
+  return std::string("app-aot-elf.so"); // dw: TODO: There seems to be no convention name we could use, so let's temporary hardcode the file name.
 }
 
 }  // namespace flutter

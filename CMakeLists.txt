@@ -11,7 +11,7 @@ endif()
 cmake_minimum_required(VERSION 3.10)
 project(flutter_wayland)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 
 include(DownloadProject/DownloadProject.cmake)
 
@@ -109,6 +109,11 @@ if(NOT FLUTTER_PATH STREQUAL "")
     set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY BOTH)
     set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE BOTH)
   endif()
+  find_path(ELFIO_INCLUDE_DIR NAMES "elfio/elfio.hpp")
+  if ("${ELFIO_INCLUDE_DIR}" STREQUAL "ELFIO_INCLUDE_DIR-NOTFOUND")
+    message(FATAL_ERROR "Could not found elfio library.")
+  endif()
+  message("${ELFIO_INCLUDE_DIR}")
   find_library(FLUTTER_LIBRARY NAMES flutter_engine HINTS ${FLUTTER_PATH})
   find_path(FLUTTER_INCLUDE_DIR flutter_embedder.h HINTS ${FLUTTER_PATH})
   file(COPY ${FLUTTER_INCLUDE_DIR}/icudtl.dat
@@ -153,4 +158,6 @@ target_include_directories(${FLUTTER_BINARY_NAME}
   ${CMAKE_BINARY_DIR}
   ${FLUTTER_INCLUDE_DIR}
   ${IARM_INCLUDE_DIRS}
+  ${ELFIO_INCLUDE_DIR}
+  ${CMAKE_SOURCE_DIR}/src
 )

@@ -10,9 +10,11 @@
 #include <chrono>
 #include <sstream>
 #include <vector>
+#include <fstream>
 
 #include "logger.h"
 #include "utils.h"
+#include "elf.h"
 
 namespace flutter {
 
@@ -107,6 +109,24 @@ FlutterApplication::FlutterApplication(
   args.icu_data_path = icu_data_path.c_str();
   args.command_line_argc = static_cast<int>(command_line_args_c.size());
   args.command_line_argv = command_line_args_c.data();
+
+  std::string libapp_aot_path = bundle_path + "/" + FlutterGetAppAotElfName(); // dw: TODO: There seems to be no convention name we could use, so let's temporary hardcode the path.
+
+  if (FlutterEngineRunsAOTCompiledDartCode()) {
+    SPDLOG_DEBUG("Using AOT precompiled runtime.");
+
+    if (std::ifstream(libapp_aot_path)) {
+      SPDLOG_DEBUG("Lading AOT snapshot: {}", libapp_aot_path);
+
+      const char *error;
+      auto handle = Aot_LoadELF(libapp_aot_path.c_str(), 0, &error, &args.vm_snapshot_data, &args.vm_snapshot_instructions, &args.isolate_snapshot_data, &args.isolate_snapshot_instructions);
+
+      if (!handle) {
+        SPDLOG_ERROR("Could not load AOT library: {} (error: {})", libapp_aot_path, error);
+        return;
+      }
+    }
+  }
 
   auto result = FlutterEngineRun(FLUTTER_ENGINE_VERSION, &config, &args,
                                  this /* userdata */, &engine_);
