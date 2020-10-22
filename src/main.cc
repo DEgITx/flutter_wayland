@@ -92,7 +92,7 @@ static bool Main(std::vector<std::string> args) {
 
   const auto asset_bundle_path = args[0];
 #else
-  const auto asset_bundle_path = (args.size() > 0 && args[0].size() > 0) ? args[0] : "/usr/share/flutter/main/flutter_assets";
+  const auto asset_bundle_path = (args.size() > 0 && args[0].size() > 0) ? args[0] : "/usr/share/flutter/main/data/flutter_assets";
 #endif
 
   if (!FlutterAssetBundleIsValid(asset_bundle_path)) {
