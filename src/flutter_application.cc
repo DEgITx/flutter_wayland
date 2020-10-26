@@ -48,9 +48,9 @@ FlutterApplication::FlutterApplication(
     std::string bundle_path,
     const std::vector<std::string>& command_line_args,
     RenderDelegate& render_delegate,
-    EventEmitter& event_emitter)
+    DisplayEventEmitter& display_event_emitter)
     : render_delegate_(render_delegate),
-      event_emitter_(event_emitter),
+      display_event_emitter_(display_event_emitter),
       display_event_listener_(this) {
   if (!FlutterAssetBundleIsValid(bundle_path)) {
     SPDLOG_ERROR("Flutter asset bundle was not valid.");
@@ -136,13 +136,13 @@ FlutterApplication::FlutterApplication(
     return;
   }
 
-  event_emitter_.addListener(&display_event_listener_);
+  display_event_emitter_.addListener(&display_event_listener_);
 
   valid_ = true;
 }
 
 FlutterApplication::~FlutterApplication() {
-  event_emitter_.removeListener(&display_event_listener_);
+  display_event_emitter_.removeListener(&display_event_listener_);
 
   if (engine_ == nullptr) {
     return;

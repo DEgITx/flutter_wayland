@@ -14,45 +14,19 @@
 #include "keys.h"
 #include "logger.h"
 #include "macros.h"
+#include "render_delegate.h"
+#include "display_event_emitter.h"
+#include "display_event_listener.h"
 
 namespace flutter {
 
 class FlutterApplication {
- public:
-  class RenderDelegate {
-   public:
-    virtual bool OnApplicationContextMakeCurrent() = 0;
 
-    virtual bool OnApplicationContextClearCurrent() = 0;
-
-    virtual bool OnApplicationPresent() = 0;
-
-    virtual uint32_t OnApplicationGetOnscreenFBO() = 0;
-  };
-  class EventListener {
-   public:
-    virtual void OnKeyboardKey(uint32_t evdev_keycode,
-                               uint32_t xkb_keycode,
-                               uint32_t utf32,
-                               bool pressed,
-                               SimpleKeyboardModifiers& mods) = 0;
-  };
-  class EventEmitter {
-   protected:
-    std::vector<EventListener*> kEventListeners;
-
-   public:
-    void addListener(EventListener* l) { kEventListeners.push_back(l); }
-
-    void removeListener(EventListener* l) {
-      std::remove(kEventListeners.begin(), kEventListeners.end(), l);
-    }
-  };
-
+public:
   FlutterApplication(std::string bundle_path,
                      const std::vector<std::string>& args,
                      RenderDelegate& render_delegate,
-                     EventEmitter& event_emitter);
+                     DisplayEventEmitter& display_event_emitter);
 
   ~FlutterApplication();
 
@@ -65,11 +39,11 @@ class FlutterApplication {
   bool SendPointerEvent(int button, int x, int y);
 
  private:
-  class DisplayEventListener : public EventListener {
+  class EventListener : public DisplayEventListener {
     FlutterApplication* parent;
 
    public:
-    DisplayEventListener(FlutterApplication* p) { parent = p; }
+    EventListener(FlutterApplication* p) { parent = p; }
 
     void OnKeyboardKey(uint32_t evdev_keycode,
                        uint32_t xkb_keycode,
@@ -95,7 +69,7 @@ class FlutterApplication {
 
   bool valid_;
   RenderDelegate& render_delegate_;
-  EventEmitter& event_emitter_;
+  DisplayEventEmitter& display_event_emitter_;
   FlutterEngine engine_ = nullptr;
   int last_button_ = 0;
 
