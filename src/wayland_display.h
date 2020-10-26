@@ -28,13 +28,14 @@
 #include <uv.h>
 
 #include "cify.h"
-#include "flutter_application.h"
+#include "display_event_emitter.h"
+#include "logger.h"
 #include "macros.h"
+#include "render_delegate.h"
 
 namespace flutter {
 
-class WaylandDisplay : public FlutterApplication::RenderDelegate,
-                       public FlutterApplication::EventEmitter {
+class WaylandDisplay : public RenderDelegate, public DisplayEventEmitter {
  public:
   WaylandDisplay(size_t width,
                  size_t height,
@@ -296,16 +297,16 @@ class WaylandDisplay : public FlutterApplication::RenderDelegate,
 
   bool StopRunning();
 
-  // |flutter::FlutterApplication::RenderDelegate|
+  // |flutter::RenderDelegate|
   bool OnApplicationContextMakeCurrent() override;
 
-  // |flutter::FlutterApplication::RenderDelegate|
+  // |flutter::RenderDelegate|
   bool OnApplicationContextClearCurrent() override;
 
-  // |flutter::FlutterApplication::RenderDelegate|
+  // |flutter::RenderDelegate|
   bool OnApplicationPresent() override;
 
-  // |flutter::FlutterApplication::RenderDelegate|
+  // |flutter::RenderDelegate|
   uint32_t OnApplicationGetOnscreenFBO() override;
 
   FLWAY_DISALLOW_COPY_AND_ASSIGN(WaylandDisplay);

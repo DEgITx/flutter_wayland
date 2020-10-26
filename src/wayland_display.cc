@@ -866,7 +866,7 @@ void WaylandDisplay::UnannounceRegistryInterface(
     struct wl_registry* wl_registry,
     uint32_t name) {}
 
-// |flutter::FlutterApplication::RenderDelegate|
+// |flutter::RenderDelegate|
 bool WaylandDisplay::OnApplicationContextMakeCurrent() {
   if (!valid_) {
     SPDLOG_ERROR("Invalid display.");
@@ -883,7 +883,7 @@ bool WaylandDisplay::OnApplicationContextMakeCurrent() {
   return true;
 }
 
-// |flutter::FlutterApplication::RenderDelegate|
+// |flutter::RenderDelegate|
 bool WaylandDisplay::OnApplicationContextClearCurrent() {
   if (!valid_) {
     SPDLOG_ERROR("Invalid display.");
@@ -900,7 +900,7 @@ bool WaylandDisplay::OnApplicationContextClearCurrent() {
   return true;
 }
 
-// |flutter::FlutterApplication::RenderDelegate|
+// |flutter::RenderDelegate|
 bool WaylandDisplay::OnApplicationPresent() {
   if (!valid_) {
     SPDLOG_ERROR("Invalid display.");
@@ -916,7 +916,7 @@ bool WaylandDisplay::OnApplicationPresent() {
   return true;
 }
 
-// |flutter::FlutterApplication::RenderDelegate|
+// |flutter::RenderDelegate|
 uint32_t WaylandDisplay::OnApplicationGetOnscreenFBO() {
   if (!valid_) {
     SPDLOG_ERROR("Invalid display.");
