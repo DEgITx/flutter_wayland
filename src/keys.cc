@@ -188,20 +188,5 @@ int toGLFWModifiers(SimpleKeyboardModifiers& mods) {
 }
 // }
 
-#ifdef USE_IARM_BUS
-uint32_t irToLinuxEvdevKeycode(uint32_t keycode) {
-  size_t i;
-
-  for (i = 0;
-       i < (sizeof(kcodesMap_IARM2Linux) / sizeof(kcodesMap_IARM2Linux[0]));
-       i++) {
-    if (kcodesMap_IARM2Linux[i].iCode == keycode) {
-      return kcodesMap_IARM2Linux[i].uCode;
-    }
-  }
-
-  return KEY_UNKNOWN;
-}
-#endif
 
 }  // namespace flutter

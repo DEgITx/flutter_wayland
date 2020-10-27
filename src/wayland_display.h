@@ -13,10 +13,6 @@
 #include "wayland-xdg-shell-client-protocol.h"
 #endif
 
-#ifdef USE_IARM_BUS
-#include "iarm.h"
-#endif
-
 #ifdef USE_COMPOSITOR_LAYOUT
 #include <weston-nsc-backend/settop-shell-client-protocol.h>
 #endif
@@ -49,13 +45,6 @@ class WaylandDisplay : public RenderDelegate, public DisplayEventEmitter {
   bool Run();
 
  private:
-  enum InputSource {
-    INPUT_SOURCE_KEYBOARD,
-#ifdef USE_IARM_BUS
-    INPUT_SOURCE_IR,
-#endif
-  };
-
   static const wl_registry_listener kRegistryListener;
   static const wl_shell_surface_listener kShellSurfaceListener;
 #ifdef USE_XDG_SHELL
@@ -192,7 +181,6 @@ class WaylandDisplay : public RenderDelegate, public DisplayEventEmitter {
   xkb_keymap* xkb_keymap_ = nullptr;
   xkb_context* xkb_context_ = nullptr;
 
-  InputSource last_input_source_;
   uint32_t last_evdev_keycode_ = 0;
   uint32_t last_xkb_keycode_ = 0;
   uint32_t last_utf32_ = 0;
@@ -202,13 +190,6 @@ class WaylandDisplay : public RenderDelegate, public DisplayEventEmitter {
 
 #ifdef USE_COMPOSITOR_LAYOUT
   compositor_layout* compositor_layout_ = nullptr;
-#endif
-
-#ifdef USE_IARM_BUS
-  bool ir_input_source_enabled_ = false;
-  uv_async_t* ir_events_async_;
-  uv_rwlock_t ir_events_rw_lock_;
-  std::vector<IARM_Bus_IRMgr_EventData_t> ir_events_data_vector_;
 #endif
 
 #ifdef USE_XDG_SHELL
@@ -271,17 +252,6 @@ class WaylandDisplay : public RenderDelegate, public DisplayEventEmitter {
   void KeyboardHandleRepeat(uv_timer_t* handle);
 
   SimpleKeyboardModifiers KeyboardGetModifiers();
-
-#ifdef USE_IARM_BUS
-  void IrHandleKey(int key_code, int key_type, int key_src);
-
-  void IARMEventHandler(const char* owner,
-                        IARM_EventId_t eventId,
-                        void* data,
-                        size_t len);
-
-  void AsyncIARMEventHandler(uv_async_t* handle);
-#endif
 
   bool SetupEGL();
 

@@ -16,7 +16,6 @@ set(CMAKE_CXX_STANDARD 17)
 include(DownloadProject/DownloadProject.cmake)
 
 option(WITH_XDG_SHELL "Use xdg-shell protocol extension" OFF)
-option(WITH_IARM_INPUT "Use RCU input from IARM bus" ON)
 
 find_package(PkgConfig)
 pkg_check_modules(WAYLAND_CLIENT REQUIRED wayland-client)
@@ -84,9 +83,6 @@ if(RDK)
   option(RDK_WINDOW_ALIGN "Align window on RDK platform" OFF)
   add_definitions(-DRDK)
   set(WAYLAND_EGL_LIBRARIES ${WAYLAND_EGL_LIBRARIES} nxpl display_manager slauncher_client)
-  add_definitions(-DUSE_IARM_BUS)
-  set(IARM_LIBRARIES ${IARM_LIBRARIES} IARMBus)
-  set(IARM_INCLUDE_DIRS ${IARM_INCLUDE_PATHS} ${CMAKE_SYSROOT}/usr/include/rdk/iarmbus ${CMAKE_SYSROOT}/usr/include/rdk/iarmmgrs-hal)
   add_definitions(-DUSE_COMPOSITOR_LAYOUT)
   if(RDK_EMBEDDED)
     add_definitions(-DRDK_EMBEDDED)
@@ -94,13 +90,6 @@ if(RDK)
   if(RDK_WINDOW_ALIGN)
     add_definitions(-DRDK_WINDOW_ALIGN)
   endif()
-endif()
-
-# Select input source
-if(LIBERTY AND WITH_IARM_INPUT)
-  add_definitions(-DUSE_IARM_INPUT)
-else()
-  add_definitions(-DUSE_XKB_INPUT)
 endif()
 
 set(FLUTTER_PATH "" CACHE STRING "Flutter Engine path")
@@ -142,7 +131,6 @@ target_link_libraries(${FLUTTER_BINARY_NAME}
   ${EGL_LIBRARIES}
   ${XKB_LIBRARIES}
   ${FLUTTER_LIBRARY}
-  ${IARM_LIBRARIES}
 )
 
 target_include_directories(${FLUTTER_BINARY_NAME}
@@ -153,7 +141,6 @@ target_include_directories(${FLUTTER_BINARY_NAME}
   ${XKB_INCLUDE_DIRS}
   ${CMAKE_BINARY_DIR}
   ${FLUTTER_INCLUDE_DIR}
-  ${IARM_INCLUDE_DIRS}
   ${ELFIO_INCLUDE_DIR}
   ${CMAKE_SOURCE_DIR}/src
 )
