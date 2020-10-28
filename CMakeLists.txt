@@ -3,8 +3,9 @@
 # found in the LICENSE file.
 
 option(RDK "Compile under RDK platform" OFF)
+option(RDK_TOOLCHAIN "Compile under RDK platform with toolchain" OFF)
 
-if(RDK)
+if(RDK AND RDK_TOOLCHAIN)
   set(CMAKE_TOOLCHAIN_FILE toolchain.cmake)
 endif()
 
@@ -99,23 +100,27 @@ if(NOT FLUTTER_PATH STREQUAL "")
     set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE BOTH)
   endif()
   message("${ELFIO_INCLUDE_DIR}")
-  find_library(FLUTTER_LIBRARY NAMES flutter_engine HINTS ${FLUTTER_PATH})
-  find_path(FLUTTER_INCLUDE_DIR flutter_embedder.h HINTS ${FLUTTER_PATH})
-  file(COPY ${FLUTTER_INCLUDE_DIR}/icudtl.dat
+  find_library(FLUTTER_ENGINE_LIBRARIES NAMES flutter_engine HINTS ${FLUTTER_PATH})
+  find_path(FLUTTER_ENGINE_INCLUDE_DIRS flutter_embedder.h HINTS ${FLUTTER_PATH})
+  file(COPY ${FLUTTER_ENGINE_INCLUDE_DIRS}/icudtl.dat
         DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
   if(RDK)
     set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
     set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
   endif()
 else()
-  set(FLUTTER_LIBRARY "flutter_engine")
-  set(FLUTTER_INCLUDE_DIR "")
+  if(RDK AND NOT RDK_TOOLCHAIN)
+    pkg_search_module(FLUTTER_ENGINE flutter-engine)
+  else()
+    set(FLUTTER_ENGINE_LIBRARIES "flutter_engine")
+    set(FLUTTER_ENGINE_INCLUDE_DIRS "")
+  endif()
 endif()
 
 link_directories(${CMAKE_BINARY_DIR})
 
 if(RDK_EMBEDDED)
-  set(FLUTTER_BINARY_NAME flutter)
+  set(FLUTTER_BINARY_NAME flutter-launcher-wayland2)
 else()
   set(FLUTTER_BINARY_NAME flutter_wayland)
 endif()
@@ -130,7 +135,7 @@ target_link_libraries(${FLUTTER_BINARY_NAME}
   ${WAYLAND_EGL_LIBRARIES}
   ${EGL_LIBRARIES}
   ${XKB_LIBRARIES}
-  ${FLUTTER_LIBRARY}
+  ${FLUTTER_ENGINE_LIBRARIES}
 )
 
 target_include_directories(${FLUTTER_BINARY_NAME}
@@ -140,7 +145,9 @@ target_include_directories(${FLUTTER_BINARY_NAME}
   ${EGL_INCLUDE_DIRS}
   ${XKB_INCLUDE_DIRS}
   ${CMAKE_BINARY_DIR}
-  ${FLUTTER_INCLUDE_DIR}
+  ${FLUTTER_ENGINE_INCLUDE_DIRS}
   ${ELFIO_INCLUDE_DIR}
   ${CMAKE_SOURCE_DIR}/src
 )
+
+install(TARGETS ${FLUTTER_BINARY_NAME} DESTINATION bin)
