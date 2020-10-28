@@ -9,7 +9,14 @@
 #include <functional>
 #include <vector>
 
+// nasty fix of clang compilation with C++17
+#if defined(__clang__) && defined(__cplusplus) && __cplusplus == 201703L
+#define __cplusplus 201402L
 #include <nlohmann/json.hpp>
+#define __cplusplus 201703L
+#else
+#include <nlohmann/json.hpp>
+#endif
 
 #include "keys.h"
 #include "logger.h"
