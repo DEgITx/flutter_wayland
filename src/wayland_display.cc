@@ -304,6 +304,18 @@ const wl_seat_listener WaylandDisplay::kSeatListener = {
         },
 };
 
+const wl_output_listener WaylandDisplay::kOutputListener = {
+    .geometry =
+        [](void *data, struct wl_output *wl_output, int32_t x, int32_t y, int32_t physical_width, int32_t physical_height, int32_t subpixel, const char *make, const char *model, int32_t transform) {
+          printf("output.geometry(data:%p, wl_output:%p, x:%d, y:%d, physical_width:%d, physical_height:%d, subpixel:%d, make:%s, model:%s, transform:%d)\n", data, wl_output, x, y, physical_width, physical_height, subpixel, make, model,
+                 transform);
+        },
+    .mode  = [](void *data, struct wl_output *wl_output, uint32_t flags, int32_t width, int32_t height,
+               int32_t refresh) { printf("output.mode(data:%p, wl_output:%p, flags:%d, width:%d, height:%d, refresh:%d)\n", data, wl_output, flags, width, height, refresh); },
+    .done  = [](void *data, struct wl_output *wl_output) { printf("output.done(data:%p, wl_output:%p)\n", data, wl_output); },
+    .scale = [](void *data, struct wl_output *wl_output, int32_t factor) { printf("output.scale(data:%p, wl_output:%p, factor:%d)\n", data, wl_output, factor); },
+};
+
 WaylandDisplay::WaylandDisplay(size_t width, size_t height, const std::string &bundle_path, const std::vector<std::string> &command_line_args)
     : xkb_context(xkb_context_new(XKB_CONTEXT_NO_FLAGS))
     , screen_width_(width)
@@ -447,6 +459,11 @@ WaylandDisplay::~WaylandDisplay() {
   if (shell_) {
     wl_shell_destroy(shell_);
     shell_ = nullptr;
+  }
+
+  if (output_) {
+    wl_output_destroy(output_);
+    output_ = nullptr;
   }
 
   if (seat_) {
@@ -697,6 +714,12 @@ void WaylandDisplay::AnnounceRegistryInterface(struct wl_registry *registry, uin
   if (strcmp(interface, "wl_seat") == 0) {
     seat_ = static_cast<decltype(seat_)>(wl_registry_bind(registry, name, &wl_seat_interface, 1));
     wl_seat_add_listener(seat_, &kSeatListener, this);
+    return;
+  }
+
+  if (strcmp(interface, "wl_output") == 0) {
+    output_ = static_cast<decltype(output_)>(wl_registry_bind(registry, name, &wl_output_interface, 1));
+    wl_output_add_listener(output_, &kOutputListener, this);
     return;
   }
 }

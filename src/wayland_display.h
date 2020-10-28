@@ -35,6 +35,7 @@ private:
   static const wl_shell_surface_listener kShellSurfaceListener;
 
   static const wl_seat_listener kSeatListener;
+  static const wl_output_listener kOutputListener;
 
   static const wl_pointer_listener kPointerListener;
   double surface_x = 0;
@@ -55,6 +56,7 @@ private:
   wl_compositor *compositor_       = nullptr;
   wl_shell *shell_                 = nullptr;
   wl_seat *seat_                   = nullptr;
+  wl_output *output_               = nullptr;
   wl_shell_surface *shell_surface_ = nullptr;
   wl_surface *surface_             = nullptr;
   wl_egl_window *window_           = nullptr;
