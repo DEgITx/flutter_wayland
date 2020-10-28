@@ -52,7 +52,7 @@ download_project(PROJ                libuv
                  GIT_TAG             v1.39.0
                  UPDATE_DISCONNECTED 1
 )
-add_subdirectory(${libuv_SOURCE_DIR} ${libuv_BINARY_DIR})
+add_subdirectory(${libuv_SOURCE_DIR} ${libuv_BINARY_DIR} EXCLUDE_FROM_ALL)
 
 # Executable
 file(GLOB_RECURSE FLUTTER_WAYLAND_SRC
