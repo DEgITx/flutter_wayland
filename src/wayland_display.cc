@@ -422,7 +422,7 @@ bool WaylandDisplay::SetupEngine(const std::string &bundle_path, const std::vect
 
     return true;
   };
-  config.open_gl.fbo_callback          = [](void *userdata) -> uint32_t { return 0; };
+  config.open_gl.fbo_callback          = [](void *data) -> uint32_t { return 0; };
   config.open_gl.make_resource_current = [](void *data) -> bool {
     WaylandDisplay *const wd = DISPLAY;
     assert(wd);
@@ -436,7 +436,7 @@ bool WaylandDisplay::SetupEngine(const std::string &bundle_path, const std::vect
     return true;
   };
 
-  config.open_gl.gl_proc_resolver = [](void *userdata, const char *name) -> void * {
+  config.open_gl.gl_proc_resolver = [](void *data, const char *name) -> void * {
     auto address = eglGetProcAddress(name);
     if (address != nullptr) {
       return reinterpret_cast<void *>(address);
