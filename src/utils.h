@@ -5,10 +5,13 @@
 
 #pragma once
 
+#include <fstream>
 #include <flutter_embedder.h>
 #include "macros.h"
 
 namespace flutter {
+
+std::string GetICUDataPath();
 
 std::string GetExecutableName();
 

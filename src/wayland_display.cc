@@ -7,7 +7,6 @@
 #define WL_EGL_PLATFORM 1
 #endif
 
-#include <fstream>
 #include <chrono>
 #include <sstream>
 #include <vector>
@@ -29,35 +28,6 @@
 #include "wayland_display.h"
 
 namespace flutter {
-
-static std::string GetICUDataPath() {
-  auto base_directory = GetExecutableDirectory();
-  if (base_directory == "") {
-    base_directory = ".";
-  }
-
-  std::string data_directory = base_directory + "/data";
-  std::string icu_data_path  = data_directory + "/icudtl.dat";
-
-  do {
-    if (std::ifstream(icu_data_path)) {
-      std::cout << "Using: " << icu_data_path << std::endl;
-      break;
-    }
-
-    icu_data_path = "/usr/share/flutter/icudtl.dat";
-
-    if (std::ifstream(icu_data_path)) {
-      std::cout << "Using: " << icu_data_path << std::endl;
-      break;
-    }
-
-    FLWAY_ERROR << "Unnable to locate icudtl.dat file" << std::endl;
-    icu_data_path = "";
-  } while (0);
-
-  return icu_data_path;
-}
 
 #define DISPLAY reinterpret_cast<WaylandDisplay *>(data)
 
