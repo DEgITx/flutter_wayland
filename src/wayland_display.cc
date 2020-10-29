@@ -25,6 +25,7 @@
 #include "elf.h"
 #include "keys.h"
 #include "utils.h"
+#include "egl_utils.h"
 #include "wayland_display.h"
 
 namespace flutter {
@@ -380,14 +381,58 @@ WaylandDisplay::WaylandDisplay(size_t width, size_t height, const std::string &b
 }
 
 bool WaylandDisplay::SetupEngine(const std::string &bundle_path, const std::vector<std::string> &command_line_args) {
-  FlutterRendererConfig config         = {};
-  config.type                          = kOpenGL;
-  config.open_gl.struct_size           = sizeof(config.open_gl);
-  config.open_gl.make_current          = [](void *userdata) -> bool { return reinterpret_cast<WaylandDisplay *>(userdata)->OnApplicationContextMakeCurrent(); };
-  config.open_gl.clear_current         = [](void *userdata) -> bool { return reinterpret_cast<WaylandDisplay *>(userdata)->OnApplicationContextClearCurrent(); };
-  config.open_gl.present               = [](void *userdata) -> bool { return reinterpret_cast<WaylandDisplay *>(userdata)->OnApplicationPresent(); };
-  config.open_gl.fbo_callback          = [](void *userdata) -> uint32_t { return reinterpret_cast<WaylandDisplay *>(userdata)->OnApplicationGetOnscreenFBO(); };
-  config.open_gl.make_resource_current = [](void *userdata) -> bool { return reinterpret_cast<WaylandDisplay *>(userdata)->OnApplicationMakeResourceCurrent(); };
+  FlutterRendererConfig config = {};
+  config.type                  = kOpenGL;
+  config.open_gl.struct_size   = sizeof(config.open_gl);
+  config.open_gl.make_current  = [](void *data) -> bool {
+    WaylandDisplay *const wd = DISPLAY;
+    assert(wd);
+
+    if (eglMakeCurrent(wd->egl_display_, wd->egl_surface_, wd->egl_surface_, wd->egl_context_) != EGL_TRUE) {
+      LogLastEGLError();
+      FLWAY_ERROR << "Could not make the onscreen context current" << std::endl;
+      return false;
+    }
+
+    return true;
+  };
+  config.open_gl.clear_current = [](void *data) -> bool {
+    WaylandDisplay *const wd = DISPLAY;
+    assert(wd);
+
+    if (eglMakeCurrent(wd->egl_display_, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT) != EGL_TRUE) {
+      LogLastEGLError();
+      FLWAY_ERROR << "Could not clear the context." << std::endl;
+      return false;
+    }
+
+    return true;
+  };
+  config.open_gl.present = [](void *data) -> bool {
+    WaylandDisplay *const wd = DISPLAY;
+    assert(wd);
+
+    if (eglSwapBuffers(wd->egl_display_, wd->egl_surface_) != EGL_TRUE) {
+      LogLastEGLError();
+      FLWAY_ERROR << "Could not swap the EGL buffer." << std::endl;
+      return false;
+    }
+
+    return true;
+  };
+  config.open_gl.fbo_callback          = [](void *userdata) -> uint32_t { return 0; };
+  config.open_gl.make_resource_current = [](void *data) -> bool {
+    WaylandDisplay *const wd = DISPLAY;
+    assert(wd);
+
+    if (eglMakeCurrent(wd->egl_display_, wd->resource_egl_surface_, wd->resource_egl_surface_, wd->resource_egl_context_) != EGL_TRUE) {
+      LogLastEGLError();
+      FLWAY_ERROR << "Could not make the RESOURCE context current" << std::endl;
+      return false;
+    }
+
+    return true;
+  };
 
   config.open_gl.gl_proc_resolver = [](void *userdata, const char *name) -> void * {
     auto address = eglGetProcAddress(name);
@@ -562,37 +607,6 @@ bool WaylandDisplay::Run() {
   return true;
 }
 
-static void LogLastEGLError() {
-  struct EGLNameErrorPair {
-    const char *name;
-    EGLint code;
-  };
-
-#define _EGL_ERROR_DESC(a)                                                                                                                                                                                                                     \
-  { #a, a }
-
-  const EGLNameErrorPair pairs[] = {
-      _EGL_ERROR_DESC(EGL_SUCCESS),     _EGL_ERROR_DESC(EGL_NOT_INITIALIZED), _EGL_ERROR_DESC(EGL_BAD_ACCESS),          _EGL_ERROR_DESC(EGL_BAD_ALLOC),         _EGL_ERROR_DESC(EGL_BAD_ATTRIBUTE),
-      _EGL_ERROR_DESC(EGL_BAD_CONTEXT), _EGL_ERROR_DESC(EGL_BAD_CONFIG),      _EGL_ERROR_DESC(EGL_BAD_CURRENT_SURFACE), _EGL_ERROR_DESC(EGL_BAD_DISPLAY),       _EGL_ERROR_DESC(EGL_BAD_SURFACE),
-      _EGL_ERROR_DESC(EGL_BAD_MATCH),   _EGL_ERROR_DESC(EGL_BAD_PARAMETER),   _EGL_ERROR_DESC(EGL_BAD_NATIVE_PIXMAP),   _EGL_ERROR_DESC(EGL_BAD_NATIVE_WINDOW), _EGL_ERROR_DESC(EGL_CONTEXT_LOST),
-  };
-
-#undef _EGL_ERROR_DESC
-
-  const auto count = sizeof(pairs) / sizeof(EGLNameErrorPair);
-
-  EGLint last_error = eglGetError();
-
-  for (size_t i = 0; i < count; i++) {
-    if (last_error == pairs[i].code) {
-      FLWAY_ERROR << "EGL Error: " << pairs[i].name << " (" << pairs[i].code << ")" << std::endl;
-      return;
-    }
-  }
-
-  FLWAY_ERROR << "Unknown EGL Error" << std::endl;
-}
-
 bool WaylandDisplay::SetupEGL() {
 
   egl_display_ = eglGetDisplay(display_);
@@ -712,50 +726,4 @@ bool WaylandDisplay::SetupEGL() {
 
   return true;
 }
-
-bool WaylandDisplay::OnApplicationContextMakeCurrent() {
-  if (eglMakeCurrent(egl_display_, egl_surface_, egl_surface_, egl_context_) != EGL_TRUE) {
-    LogLastEGLError();
-    FLWAY_ERROR << "Could not make the onscreen context current" << std::endl;
-    return false;
-  }
-
-  return true;
-}
-
-bool WaylandDisplay::OnApplicationMakeResourceCurrent() {
-  if (eglMakeCurrent(egl_display_, resource_egl_surface_, resource_egl_surface_, resource_egl_context_) != EGL_TRUE) {
-    LogLastEGLError();
-    FLWAY_ERROR << "Could not make the RESOURCE context current" << std::endl;
-    return false;
-  }
-
-  return true;
-}
-
-bool WaylandDisplay::OnApplicationContextClearCurrent() {
-  if (eglMakeCurrent(egl_display_, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT) != EGL_TRUE) {
-    LogLastEGLError();
-    FLWAY_ERROR << "Could not clear the context." << std::endl;
-    return false;
-  }
-
-  return true;
-}
-
-bool WaylandDisplay::OnApplicationPresent() {
-  if (eglSwapBuffers(egl_display_, egl_surface_) != EGL_TRUE) {
-    LogLastEGLError();
-    FLWAY_ERROR << "Could not swap the EGL buffer." << std::endl;
-    return false;
-  }
-
-  return true;
-}
-
-uint32_t WaylandDisplay::OnApplicationGetOnscreenFBO() {
-
-  return 0; // FBO0
-}
-
 } // namespace flutter

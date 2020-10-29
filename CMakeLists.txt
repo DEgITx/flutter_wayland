@@ -28,12 +28,14 @@ set(SOURCES
     src/main.cc
     src/elf.cc
     src/keys.cc
+    src/egl_utils.cc
     src/utils.cc
     src/wayland_display.cc
     src/elf.h
     src/macros.h
     src/keys.h
     src/utils.h
+    src/egl_utils.h
     src/wayland_display.h
 )
 

@@ -76,16 +76,6 @@ private:
 
   bool StopRunning();
 
-  bool OnApplicationContextMakeCurrent();
-
-  bool OnApplicationMakeResourceCurrent();
-
-  bool OnApplicationContextClearCurrent();
-
-  bool OnApplicationPresent();
-
-  uint32_t OnApplicationGetOnscreenFBO();
-
   FLWAY_DISALLOW_COPY_AND_ASSIGN(WaylandDisplay);
 };
 
