@@ -71,7 +71,7 @@ const wl_shell_surface_listener WaylandDisplay::kShellSurfaceListener = {
     .ping = [](void *data, struct wl_shell_surface *wl_shell_surface, uint32_t serial) -> void { wl_shell_surface_pong(DISPLAY->shell_surface_, serial); },
 
     .configure = [](void *data, struct wl_shell_surface *wl_shell_surface, uint32_t edges, int32_t width, int32_t height) -> void {
-      WaylandDisplay *wd = reinterpret_cast<WaylandDisplay *>(data);
+      WaylandDisplay *const wd = DISPLAY;
 
       if (wd == nullptr)
         return;
