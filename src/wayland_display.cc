@@ -32,9 +32,38 @@ namespace flutter {
 #define DISPLAY reinterpret_cast<WaylandDisplay *>(data)
 
 const wl_registry_listener WaylandDisplay::kRegistryListener = {
-    .global = [](void *data, struct wl_registry *wl_registry, uint32_t name, const char *interface, uint32_t version) -> void { DISPLAY->AnnounceRegistryInterface(wl_registry, name, interface, version); },
+    .global = [](void *data, struct wl_registry *wl_registry, uint32_t name, const char *interface, uint32_t version) -> void {
+      WaylandDisplay *const wd = DISPLAY;
+      assert(wd);
 
-    .global_remove = [](void *data, struct wl_registry *wl_registry, uint32_t name) -> void { DISPLAY->UnannounceRegistryInterface(wl_registry, name); },
+      printf("AnnounceRegistryInterface(registry:%p, name:%2u, interface:%s, version:%u)\n", wl_registry, name, interface, version);
+
+      if (strcmp(interface, "wl_compositor") == 0) {
+        wd->compositor_ = static_cast<decltype(compositor_)>(wl_registry_bind(wl_registry, name, &wl_compositor_interface, 1));
+        return;
+      }
+
+      if (strcmp(interface, "wl_shell") == 0) {
+        wd->shell_ = static_cast<decltype(shell_)>(wl_registry_bind(wl_registry, name, &wl_shell_interface, 1));
+        return;
+      }
+
+      if (strcmp(interface, "wl_seat") == 0) {
+        wd->seat_ = static_cast<decltype(seat_)>(wl_registry_bind(wl_registry, name, &wl_seat_interface, 1));
+        wl_seat_add_listener(wd->seat_, &kSeatListener, wd);
+        return;
+      }
+
+      if (strcmp(interface, "wl_output") == 0) {
+        wd->output_ = static_cast<decltype(output_)>(wl_registry_bind(wl_registry, name, &wl_output_interface, 1));
+        wl_output_add_listener(wd->output_, &kOutputListener, wd);
+        return;
+      }
+    },
+
+    .global_remove = [](void *data, struct wl_registry *wl_registry, uint32_t name) -> void {
+
+    },
 };
 
 const wl_shell_surface_listener WaylandDisplay::kShellSurfaceListener = {
@@ -682,35 +711,6 @@ bool WaylandDisplay::SetupEGL() {
   }
 
   return true;
-}
-
-void WaylandDisplay::AnnounceRegistryInterface(struct wl_registry *registry, uint32_t name, const char *interface, uint32_t version) {
-  printf("AnnounceRegistryInterface(registry:%p, name:%2u, interface:%s, version:%u)\n", registry, name, interface, version);
-
-  if (strcmp(interface, "wl_compositor") == 0) {
-    compositor_ = static_cast<decltype(compositor_)>(wl_registry_bind(registry, name, &wl_compositor_interface, 1));
-    return;
-  }
-
-  if (strcmp(interface, "wl_shell") == 0) {
-    shell_ = static_cast<decltype(shell_)>(wl_registry_bind(registry, name, &wl_shell_interface, 1));
-    return;
-  }
-
-  if (strcmp(interface, "wl_seat") == 0) {
-    seat_ = static_cast<decltype(seat_)>(wl_registry_bind(registry, name, &wl_seat_interface, 1));
-    wl_seat_add_listener(seat_, &kSeatListener, this);
-    return;
-  }
-
-  if (strcmp(interface, "wl_output") == 0) {
-    output_ = static_cast<decltype(output_)>(wl_registry_bind(registry, name, &wl_output_interface, 1));
-    wl_output_add_listener(output_, &kOutputListener, this);
-    return;
-  }
-}
-
-void WaylandDisplay::UnannounceRegistryInterface(struct wl_registry *wl_registry, uint32_t name) {
 }
 
 bool WaylandDisplay::OnApplicationContextMakeCurrent() {

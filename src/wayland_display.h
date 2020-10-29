@@ -74,10 +74,6 @@ private:
 
   bool SetupEngine(const std::string &bundle_path, const std::vector<std::string> &command_line_args);
 
-  void AnnounceRegistryInterface(struct wl_registry *wl_registry, uint32_t name, const char *interface, uint32_t version);
-
-  void UnannounceRegistryInterface(struct wl_registry *wl_registry, uint32_t name);
-
   bool StopRunning();
 
   bool OnApplicationContextMakeCurrent();
