@@ -85,11 +85,11 @@ const wl_shell_surface_listener WaylandDisplay::kShellSurfaceListener = {
       event.struct_size               = sizeof(event);
       event.width                     = wd->screen_width_;
       event.height                    = wd->screen_height_;
-      event.pixel_ratio               = 1.0;
+      event.pixel_ratio               = wd->pixel_ratio_;
 
       auto success = FlutterEngineSendWindowMetricsEvent(wd->engine_, &event) == kSuccess;
 
-      FLWAY_LOG << "Window resized: " << width << "x" << height << " status: " << (success ? "success" : "failed") << std::endl;
+      FLWAY_LOG << "shell.configure: " << width << "x" << height << " status: " << (success ? "success" : "failed") << std::endl;
     },
 
     .popup_done = [](void *data, struct wl_shell_surface *wl_shell_surface) -> void {
@@ -307,11 +307,35 @@ const wl_seat_listener WaylandDisplay::kSeatListener = {
 const wl_output_listener WaylandDisplay::kOutputListener = {
     .geometry =
         [](void *data, struct wl_output *wl_output, int32_t x, int32_t y, int32_t physical_width, int32_t physical_height, int32_t subpixel, const char *make, const char *model, int32_t transform) {
-          printf("output.geometry(data:%p, wl_output:%p, x:%d, y:%d, physical_width:%d, physical_height:%d, subpixel:%d, make:%s, model:%s, transform:%d)\n", data, wl_output, x, y, physical_width, physical_height, subpixel, make, model,
-                 transform);
+          WaylandDisplay *const wd = DISPLAY;
+          assert(wd);
+          assert(wl_output == wd->output_);
+
+          wd->pixel_ratio_ = (double)physical_width / physical_height;
+
+          printf("output.geometry(data:%p, wl_output:%p, x:%d, y:%d, physical_width:%d, physical_height:%d, pixel_ratio_:%.2f, subpixel:%d, make:%s, model:%s, transform:%d)\n", data, wl_output, x, y, physical_width, physical_height,
+                 wd->pixel_ratio_, subpixel, make, model, transform);
         },
-    .mode  = [](void *data, struct wl_output *wl_output, uint32_t flags, int32_t width, int32_t height,
-               int32_t refresh) { printf("output.mode(data:%p, wl_output:%p, flags:%d, width:%d, height:%d, refresh:%d)\n", data, wl_output, flags, width, height, refresh); },
+    .mode =
+        [](void *data, struct wl_output *wl_output, uint32_t flags, int32_t width, int32_t height, int32_t refresh) {
+          WaylandDisplay *const wd = DISPLAY;
+          assert(wd);
+          assert(wl_output == wd->output_);
+
+          printf("output.mode(data:%p, wl_output:%p, flags:%d, width:%d->%d, height:%d->%d, refresh:%d)\n", data, wl_output, flags, wd->screen_width_, width, wd->screen_height_, height, refresh);
+
+          FlutterWindowMetricsEvent event = {};
+          event.struct_size               = sizeof(event);
+          event.width                     = (wd->screen_width_ = width);
+          event.height                    = (wd->screen_height_ = height);
+          event.pixel_ratio               = wd->pixel_ratio_;
+
+          auto success = FlutterEngineSendWindowMetricsEvent(wd->engine_, &event) == kSuccess;
+
+          wl_egl_window_resize(wd->window_, wd->screen_width_, wd->screen_height_, 0, 0);
+
+          FLWAY_LOG << "Window resized: " << event.width << "x" << event.height << " status: " << (success ? "success" : "failed") << std::endl;
+        },
     .done  = [](void *data, struct wl_output *wl_output) { printf("output.done(data:%p, wl_output:%p)\n", data, wl_output); },
     .scale = [](void *data, struct wl_output *wl_output, int32_t factor) { printf("output.scale(data:%p, wl_output:%p, factor:%d)\n", data, wl_output, factor); },
 };
@@ -429,15 +453,7 @@ bool WaylandDisplay::SetupEngine(const std::string &bundle_path, const std::vect
     return false;
   }
 
-  FlutterWindowMetricsEvent event = {};
-  event.struct_size               = sizeof(event);
-  event.width                     = screen_width_;
-  event.height                    = screen_height_;
-  event.pixel_ratio               = 1.0;
-
-  FLWAY_LOG << "WindowMetricEvent: " << event.width << "x" << event.height << std::endl;
-
-  return FlutterEngineSendWindowMetricsEvent(engine_, &event) == kSuccess;
+  return true;
 }
 
 WaylandDisplay::~WaylandDisplay() {

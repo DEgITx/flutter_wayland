@@ -51,6 +51,7 @@ private:
   bool valid_ = false;
   int screen_width_;
   int screen_height_;
+  double pixel_ratio_              = 1.0;
   wl_display *display_             = nullptr;
   wl_registry *registry_           = nullptr;
   wl_compositor *compositor_       = nullptr;
