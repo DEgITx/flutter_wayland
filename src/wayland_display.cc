@@ -104,6 +104,7 @@ const wl_pointer_listener WaylandDisplay::kPointerListener = {
         [](void *data, struct wl_pointer *wl_pointer, uint32_t serial, struct wl_surface *surface) {
           WaylandDisplay *const wd = DISPLAY;
           assert(wd);
+
           wd->key_modifiers = static_cast<GdkModifierType>(0);
         },
 
@@ -111,6 +112,7 @@ const wl_pointer_listener WaylandDisplay::kPointerListener = {
         [](void *data, struct wl_pointer *wl_pointer, uint32_t time, wl_fixed_t surface_x, wl_fixed_t surface_y) {
           WaylandDisplay *const wd = DISPLAY;
           assert(wd);
+
           // just store raw values
           wd->surface_x = surface_x;
           wd->surface_y = surface_y;
@@ -275,26 +277,26 @@ const wl_keyboard_listener WaylandDisplay::kKeyboardListener = {
 const wl_seat_listener WaylandDisplay::kSeatListener = {
     .capabilities =
         [](void *data, struct wl_seat *seat, uint32_t capabilities) {
-          printf("capabilities(data:%p, seat:%p, capabilities:0x%x)\n", data, seat, capabilities);
-
           WaylandDisplay *const wd = DISPLAY;
           assert(wd);
           assert(seat == wd->seat_);
 
+          printf("seat.capabilities(data:%p, seat:%p, capabilities:0x%x)\n", data, seat, capabilities);
+
           if (capabilities & WL_SEAT_CAPABILITY_POINTER) {
-            printf("seat_capabilities - pointer\n");
+            printf("seat.capabilities: pointer\n");
             struct wl_pointer *pointer = wl_seat_get_pointer(seat);
             wl_pointer_add_listener(pointer, &kPointerListener, wd);
           }
 
           if (capabilities & WL_SEAT_CAPABILITY_KEYBOARD) {
-            printf("seat_capabilities - keyboard\n");
+            printf("seat.capabilities: keyboard\n");
             struct wl_keyboard *keyboard = wl_seat_get_keyboard(seat);
             wl_keyboard_add_listener(keyboard, &kKeyboardListener, wd);
           }
 
           if (capabilities & WL_SEAT_CAPABILITY_TOUCH) {
-            printf("seat_capabilities - touch\n");
+            printf("seat.capabilities: touch\n");
           }
         },
 
