@@ -30,12 +30,21 @@
 
 namespace flutter {
 
-#define DISPLAY reinterpret_cast<WaylandDisplay *>(data)
+static inline WaylandDisplay *const get_wayland_display(void *data, const bool check_non_null = true) {
+  WaylandDisplay *const wd = static_cast<WaylandDisplay *>(data);
+
+  if (check_non_null) {
+    assert(wd);
+    if (wd == nullptr)
+      abort();
+  }
+
+  return wd;
+}
 
 const wl_registry_listener WaylandDisplay::kRegistryListener = {
     .global = [](void *data, struct wl_registry *wl_registry, uint32_t name, const char *interface, uint32_t version) -> void {
-      WaylandDisplay *const wd = DISPLAY;
-      assert(wd);
+      WaylandDisplay *const wd = get_wayland_display(data);
 
       printf("AnnounceRegistryInterface(registry:%p, name:%2u, interface:%s, version:%u)\n", wl_registry, name, interface, version);
 
@@ -68,10 +77,14 @@ const wl_registry_listener WaylandDisplay::kRegistryListener = {
 };
 
 const wl_shell_surface_listener WaylandDisplay::kShellSurfaceListener = {
-    .ping = [](void *data, struct wl_shell_surface *wl_shell_surface, uint32_t serial) -> void { wl_shell_surface_pong(DISPLAY->shell_surface_, serial); },
+    .ping = [](void *data, struct wl_shell_surface *wl_shell_surface, uint32_t serial) -> void {
+      WaylandDisplay *const wd = get_wayland_display(data);
+
+      wl_shell_surface_pong(wd->shell_surface_, serial);
+    },
 
     .configure = [](void *data, struct wl_shell_surface *wl_shell_surface, uint32_t edges, int32_t width, int32_t height) -> void {
-      WaylandDisplay *const wd = DISPLAY;
+      WaylandDisplay *const wd = get_wayland_display(data, false);
 
       if (wd == nullptr)
         return;
@@ -102,16 +115,14 @@ const wl_pointer_listener WaylandDisplay::kPointerListener = {
 
     .leave =
         [](void *data, struct wl_pointer *wl_pointer, uint32_t serial, struct wl_surface *surface) {
-          WaylandDisplay *const wd = DISPLAY;
-          assert(wd);
+          WaylandDisplay *const wd = get_wayland_display(data);
 
           wd->key_modifiers = static_cast<GdkModifierType>(0);
         },
 
     .motion =
         [](void *data, struct wl_pointer *wl_pointer, uint32_t time, wl_fixed_t surface_x, wl_fixed_t surface_y) {
-          WaylandDisplay *const wd = DISPLAY;
-          assert(wd);
+          WaylandDisplay *const wd = get_wayland_display(data);
 
           // just store raw values
           wd->surface_x = surface_x;
@@ -120,8 +131,7 @@ const wl_pointer_listener WaylandDisplay::kPointerListener = {
 
     .button =
         [](void *data, struct wl_pointer *wl_pointer, uint32_t serial, uint32_t time, uint32_t button, uint32_t state) {
-          WaylandDisplay *const wd = DISPLAY;
-          assert(wd);
+          WaylandDisplay *const wd = get_wayland_display(data);
 
           uint32_t button_number = button - BTN_LEFT;
           button_number          = button_number == 1 ? 2 : button_number == 2 ? 1 : button_number;
@@ -158,8 +168,7 @@ const wl_pointer_listener WaylandDisplay::kPointerListener = {
 const wl_keyboard_listener WaylandDisplay::kKeyboardListener = {
     .keymap =
         [](void *data, struct wl_keyboard *wl_keyboard, uint32_t format, int32_t fd, uint32_t size) {
-          WaylandDisplay *const wd = DISPLAY;
-          assert(wd);
+          WaylandDisplay *const wd = get_wayland_display(data);
 
           wd->keymap_format         = static_cast<wl_keyboard_keymap_format>(format);
           char *const keymap_string = reinterpret_cast<char *const>(mmap(nullptr, size, PROT_READ, MAP_PRIVATE, fd, 0));
@@ -177,8 +186,7 @@ const wl_keyboard_listener WaylandDisplay::kKeyboardListener = {
 
     .key =
         [](void *data, struct wl_keyboard *wl_keyboard, uint32_t serial, uint32_t time, uint32_t key, uint32_t state_w) {
-          WaylandDisplay *const wd = DISPLAY;
-          assert(wd);
+          WaylandDisplay *const wd = get_wayland_display(data);
 
           if (wd->keymap_format == WL_KEYBOARD_KEYMAP_FORMAT_NO_KEYMAP) {
             printf("Hmm - no keymap, no key event\n");
@@ -265,8 +273,7 @@ const wl_keyboard_listener WaylandDisplay::kKeyboardListener = {
 
     .modifiers =
         [](void *data, struct wl_keyboard *wl_keyboard, uint32_t serial, uint32_t mods_depressed, uint32_t mods_latched, uint32_t mods_locked, uint32_t group) {
-          WaylandDisplay *const wd = DISPLAY;
-          assert(wd);
+          WaylandDisplay *const wd = get_wayland_display(data);
 
           xkb_state_update_mask(wd->xkb_state, mods_depressed, mods_latched, mods_locked, group, 0, 0);
         },
@@ -277,8 +284,7 @@ const wl_keyboard_listener WaylandDisplay::kKeyboardListener = {
 const wl_seat_listener WaylandDisplay::kSeatListener = {
     .capabilities =
         [](void *data, struct wl_seat *seat, uint32_t capabilities) {
-          WaylandDisplay *const wd = DISPLAY;
-          assert(wd);
+          WaylandDisplay *const wd = get_wayland_display(data);
           assert(seat == wd->seat_);
 
           printf("seat.capabilities(data:%p, seat:%p, capabilities:0x%x)\n", data, seat, capabilities);
@@ -309,9 +315,7 @@ const wl_seat_listener WaylandDisplay::kSeatListener = {
 const wl_output_listener WaylandDisplay::kOutputListener = {
     .geometry =
         [](void *data, struct wl_output *wl_output, int32_t x, int32_t y, int32_t physical_width, int32_t physical_height, int32_t subpixel, const char *make, const char *model, int32_t transform) {
-          WaylandDisplay *const wd = DISPLAY;
-          assert(wd);
-          assert(wl_output == wd->output_);
+          WaylandDisplay *const wd = get_wayland_display(data);
 
           wd->pixel_ratio_ = (double)physical_width / physical_height;
 
@@ -320,27 +324,26 @@ const wl_output_listener WaylandDisplay::kOutputListener = {
         },
     .mode =
         [](void *data, struct wl_output *wl_output, uint32_t flags, int32_t width, int32_t height, int32_t refresh) {
-          WaylandDisplay *const wd = DISPLAY;
-          assert(wd);
-          assert(wl_output == wd->output_);
+          WaylandDisplay *const wd = get_wayland_display(data);
 
           printf("output.mode(data:%p, wl_output:%p, flags:%d, width:%d->%d, height:%d->%d, refresh:%d)\n", data, wl_output, flags, wd->screen_width_, width, wd->screen_height_, height, refresh);
 
           if (wd->engine_) {
-              FlutterWindowMetricsEvent event = {};
-              event.struct_size               = sizeof(event);
-              event.width                     = (wd->screen_width_ = width);
-              event.height                    = (wd->screen_height_ = height);
-              event.pixel_ratio               = wd->pixel_ratio_;
+            FlutterWindowMetricsEvent event = {};
+            event.struct_size               = sizeof(event);
+            event.width                     = (wd->screen_width_ = width);
+            event.height                    = (wd->screen_height_ = height);
+            event.pixel_ratio               = wd->pixel_ratio_;
 
-              auto success = FlutterEngineSendWindowMetricsEvent(wd->engine_, &event) == kSuccess;
+            auto success = FlutterEngineSendWindowMetricsEvent(wd->engine_, &event) == kSuccess;
 
-              wl_egl_window_resize(wd->window_, wd->screen_width_, wd->screen_height_, 0, 0);
+            wl_egl_window_resize(wd->window_, wd->screen_width_, wd->screen_height_, 0, 0);
 
-              FLWAY_LOG << "Window resized: " << event.width << "x" << event.height << " status: " << (success ? "success" : "failed") << std::endl;
+            FLWAY_LOG << "Window resized: " << event.width << "x" << event.height << " status: " << (success ? "success" : "failed") << std::endl;
           } else {
-              wd->pixel_ratio_skipped_ = true;
-              FLWAY_LOG << "Window resized: " << wd->screen_width_ << "x" << wd->screen_width_ << " status: " << "skipped" << std::endl;
+            wd->pixel_ratio_skipped_ = true;
+            FLWAY_LOG << "Window resized: " << wd->screen_width_ << "x" << wd->screen_width_ << " status: "
+                      << "skipped" << std::endl;
           }
         },
     .done  = [](void *data, struct wl_output *wl_output) { printf("output.done(data:%p, wl_output:%p)\n", data, wl_output); },
@@ -392,8 +395,7 @@ bool WaylandDisplay::SetupEngine(const std::string &bundle_path, const std::vect
   config.type                  = kOpenGL;
   config.open_gl.struct_size   = sizeof(config.open_gl);
   config.open_gl.make_current  = [](void *data) -> bool {
-    WaylandDisplay *const wd = DISPLAY;
-    assert(wd);
+    WaylandDisplay *const wd = get_wayland_display(data);
 
     if (eglMakeCurrent(wd->egl_display_, wd->egl_surface_, wd->egl_surface_, wd->egl_context_) != EGL_TRUE) {
       LogLastEGLError();
@@ -404,8 +406,7 @@ bool WaylandDisplay::SetupEngine(const std::string &bundle_path, const std::vect
     return true;
   };
   config.open_gl.clear_current = [](void *data) -> bool {
-    WaylandDisplay *const wd = DISPLAY;
-    assert(wd);
+    WaylandDisplay *const wd = get_wayland_display(data);
 
     if (eglMakeCurrent(wd->egl_display_, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT) != EGL_TRUE) {
       LogLastEGLError();
@@ -416,8 +417,7 @@ bool WaylandDisplay::SetupEngine(const std::string &bundle_path, const std::vect
     return true;
   };
   config.open_gl.present = [](void *data) -> bool {
-    WaylandDisplay *const wd = DISPLAY;
-    assert(wd);
+    WaylandDisplay *const wd = get_wayland_display(data);
 
     if (eglSwapBuffers(wd->egl_display_, wd->egl_surface_) != EGL_TRUE) {
       LogLastEGLError();
@@ -429,8 +429,7 @@ bool WaylandDisplay::SetupEngine(const std::string &bundle_path, const std::vect
   };
   config.open_gl.fbo_callback          = [](void *data) -> uint32_t { return 0; };
   config.open_gl.make_resource_current = [](void *data) -> bool {
-    WaylandDisplay *const wd = DISPLAY;
-    assert(wd);
+    WaylandDisplay *const wd = get_wayland_display(data);
 
     if (eglMakeCurrent(wd->egl_display_, wd->resource_egl_surface_, wd->resource_egl_surface_, wd->resource_egl_context_) != EGL_TRUE) {
       LogLastEGLError();
@@ -507,10 +506,10 @@ bool WaylandDisplay::SetupEngine(const std::string &bundle_path, const std::vect
   if (pixel_ratio_skipped_) {
     FlutterWindowMetricsEvent event = {};
 
-    event.struct_size               = sizeof(event);
-    event.width                     = screen_width_;
-    event.height                    = screen_height_;
-    event.pixel_ratio               = pixel_ratio_;
+    event.struct_size = sizeof(event);
+    event.width       = screen_width_;
+    event.height      = screen_height_;
+    event.pixel_ratio = pixel_ratio_;
 
     const auto success = FlutterEngineSendWindowMetricsEvent(engine_, &event) == kSuccess;
 
