@@ -151,7 +151,7 @@ static bool Main(std::vector<std::string> args) {
 
 int main(int argc, char* argv[]) {
   auto console = spdlog::stdout_color_mt("console");
-  spdlog::set_level(spdlog::level::trace);
+  spdlog::set_level(spdlog::level::debug);
   spdlog::set_default_logger(console);
   spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$] %s:%#: %!: %v");
 
@@ -159,5 +159,10 @@ int main(int argc, char* argv[]) {
   for (int i = 1; i < argc; ++i) {
     args.push_back(argv[i]);
   }
-  return flutter::Main(std::move(args)) ? EXIT_SUCCESS : EXIT_FAILURE;
+
+  int res = flutter::Main(std::move(args)) ? EXIT_SUCCESS : EXIT_FAILURE;
+
+  SPDLOG_INFO("Application exited normally with: {}", res);
+
+  return res;
 }

@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include <xkbcommon/xkbcommon-names.h>
 
+#include <csignal>
 #include <cstring>
 
 #include "logger.h"
@@ -117,9 +118,8 @@ void WaylandDisplay::KeyboardHandleKey(void* data,
                                        uint32_t time,
                                        uint32_t key,
                                        uint32_t state) {
-  SPDLOG_TRACE(
-      "key = {} state = {} keymap_format_ = {}",
-      key, state, keymap_format_);
+  SPDLOG_TRACE("key = {} state = {} keymap_format_ = {}", key, state,
+               keymap_format_);
 
   uint32_t evdev_keycode = key;
   uint32_t xkb_keycode;
@@ -308,7 +308,6 @@ WaylandDisplay::WaylandDisplay(size_t width,
       screen_width_align(width_align),
       screen_height_align(height_align),
       xkb_context_(xkb_context_new(XKB_CONTEXT_NO_FLAGS)) {
-
   if (screen_width_ == 0 || screen_height_ == 0) {
     SPDLOG_ERROR("Invalid screen dimensions.");
     return;
@@ -431,6 +430,13 @@ void WaylandDisplay::ProcessWaylandEvents(uv_poll_t* handle,
   wl_display_dispatch(display_);
 }
 
+void WaylandDisplay::SignalHandler(int signum) {
+  SPDLOG_INFO("signum = {}", signum);
+  if (signum == SIGINT) {
+    uv_stop(loop_);
+  }
+}
+
 bool WaylandDisplay::Run() {
   SPDLOG_DEBUG("valid_ = {}", valid_);
 
@@ -439,21 +445,24 @@ bool WaylandDisplay::Run() {
     return false;
   }
 
-  uv_loop_t* loop = new uv_loop_t;
-  uv_loop_init(loop);
+  signal(SIGINT,
+         cify([self = this](int signum) { self->SignalHandler(signum); }));
+
+  loop_ = new uv_loop_t;
+  uv_loop_init(loop_);
 
   uv_poll_t* wl_events_poll_handle = new uv_poll_t;
-  uv_poll_init(loop, wl_events_poll_handle, wl_display_get_fd(display_));
+  uv_poll_init(loop_, wl_events_poll_handle, wl_display_get_fd(display_));
 
   key_repeat_timer_handle_ = new uv_timer_t;
-  uv_timer_init(loop, key_repeat_timer_handle_);
+  uv_timer_init(loop_, key_repeat_timer_handle_);
 
   uv_poll_start(wl_events_poll_handle, UV_READABLE,
                 cify([self = this](uv_poll_t* handle, int status, int events) {
                   self->ProcessWaylandEvents(handle, status, events);
                 }));
 
-  uv_run(loop, UV_RUN_DEFAULT);
+  uv_run(loop_, UV_RUN_DEFAULT);
 
   uv_timer_stop(key_repeat_timer_handle_);
   delete key_repeat_timer_handle_;
@@ -461,8 +470,8 @@ bool WaylandDisplay::Run() {
   uv_poll_stop(wl_events_poll_handle);
   delete wl_events_poll_handle;
 
-  uv_loop_close(loop);
-  delete loop;
+  uv_loop_close(loop_);
+  delete loop_;
 
   return true;
 }
@@ -656,16 +665,17 @@ bool WaylandDisplay::SetupEGL() {
     }
   }
 
-  const EGLint pbuffer_config_attribs[] = {
-      EGL_HEIGHT, 64,
-      EGL_WIDTH, 64,
-      EGL_NONE
-  };
+  const EGLint pbuffer_config_attribs[] = {EGL_HEIGHT, 64, EGL_WIDTH, 64,
+                                           EGL_NONE};
 
-  resource_egl_context_ = eglCreateContext(egl_display_, egl_config, egl_context_ /* share group */, ctx_attribs);
-  resource_egl_surface_ = eglCreatePbufferSurface(egl_display_, egl_config, pbuffer_config_attribs);
+  resource_egl_context_ = eglCreateContext(
+      egl_display_, egl_config, egl_context_ /* share group */, ctx_attribs);
+  resource_egl_surface_ =
+      eglCreatePbufferSurface(egl_display_, egl_config, pbuffer_config_attribs);
 
-  SPDLOG_DEBUG("created egl resource surface = {} with context = {}", fmt::ptr(resource_egl_surface_), fmt::ptr(resource_egl_context_));
+  SPDLOG_DEBUG("created egl resource surface = {} with context = {}",
+               fmt::ptr(resource_egl_surface_),
+               fmt::ptr(resource_egl_context_));
 
   wl_egl_window_resize(window_, screen_width_ - (screen_width_align * 2),
                        screen_height_ - (screen_height_align * 2),
@@ -785,7 +795,8 @@ uint32_t WaylandDisplay::OnApplicationGetOnscreenFBO() {
 }
 
 bool WaylandDisplay::OnApplicationMakeResourceCurrent() {
-  if (eglMakeCurrent(egl_display_, resource_egl_surface_, resource_egl_surface_, resource_egl_context_) != EGL_TRUE) {
+  if (eglMakeCurrent(egl_display_, resource_egl_surface_, resource_egl_surface_,
+                     resource_egl_context_) != EGL_TRUE) {
     LogLastEGLError();
     SPDLOG_ERROR("Could not make the RESOURCE context current");
     return false;
