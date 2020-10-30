@@ -184,6 +184,8 @@ class WaylandDisplay : public RenderDelegate, public DisplayEventEmitter {
   xkb_keymap* xkb_keymap_ = nullptr;
   xkb_context* xkb_context_ = nullptr;
 
+  uv_loop_t* loop_ = nullptr;
+
   uint32_t last_evdev_keycode_ = 0;
   uint32_t last_xkb_keycode_ = 0;
   uint32_t last_utf32_ = 0;
@@ -210,6 +212,8 @@ class WaylandDisplay : public RenderDelegate, public DisplayEventEmitter {
   static void XdgToplevelCloseHandler(void* data,
                                       struct xdg_toplevel* xdg_toplevel);
 #endif
+
+  void SignalHandler(int signum);
 
   void SeatHandleCapabilities(void* data, struct wl_seat* seat, uint32_t caps);
 
