@@ -433,8 +433,12 @@ void WaylandDisplay::ProcessWaylandEvents(uv_poll_t* handle,
 void WaylandDisplay::SignalHandler(int signum) {
   SPDLOG_INFO("signum = {}", signum);
   if (signum == SIGINT) {
-    uv_stop(loop_);
+    uv_async_send(signal_event_async_);
   }
+}
+
+void WaylandDisplay::AsyncSignalHandler(uv_async_t* handle) {
+  uv_stop(loop_);
 }
 
 bool WaylandDisplay::Run() {
@@ -462,7 +466,16 @@ bool WaylandDisplay::Run() {
                   self->ProcessWaylandEvents(handle, status, events);
                 }));
 
+  signal_event_async_ = new uv_async_t;
+  uv_async_init(loop_, signal_event_async_,
+                cify([self = this](uv_async_t* handle) {
+                  self->AsyncSignalHandler(handle);
+                }));
+
   uv_run(loop_, UV_RUN_DEFAULT);
+
+  uv_close((uv_handle_t*)signal_event_async_, NULL);
+  delete signal_event_async_;
 
   uv_timer_stop(key_repeat_timer_handle_);
   delete key_repeat_timer_handle_;

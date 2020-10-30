@@ -185,6 +185,7 @@ class WaylandDisplay : public RenderDelegate, public DisplayEventEmitter {
   xkb_context* xkb_context_ = nullptr;
 
   uv_loop_t* loop_ = nullptr;
+  uv_async_t* signal_event_async_ = nullptr;
 
   uint32_t last_evdev_keycode_ = 0;
   uint32_t last_xkb_keycode_ = 0;
@@ -214,6 +215,8 @@ class WaylandDisplay : public RenderDelegate, public DisplayEventEmitter {
 #endif
 
   void SignalHandler(int signum);
+
+  void AsyncSignalHandler(uv_async_t* handle);
 
   void SeatHandleCapabilities(void* data, struct wl_seat* seat, uint32_t caps);
 
