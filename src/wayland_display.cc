@@ -30,6 +30,16 @@
 
 namespace flutter {
 
+static double get_pixel_ratio(int32_t physical_width, int32_t physical_height, int32_t pixels_width, int32_t pixels_height) {
+
+  if (pixels_width == 0 || physical_height == 0 || pixels_width == 0 || pixels_height == 0) {
+    return 1.0;
+  }
+
+  // TODO
+  return 1.0;
+}
+
 static inline WaylandDisplay *const get_wayland_display(void *data, const bool check_non_null = true) {
   WaylandDisplay *const wd = static_cast<WaylandDisplay *>(data);
 
@@ -98,11 +108,11 @@ const wl_shell_surface_listener WaylandDisplay::kShellSurfaceListener = {
       event.struct_size               = sizeof(event);
       event.width                     = wd->screen_width_;
       event.height                    = wd->screen_height_;
-      event.pixel_ratio               = wd->pixel_ratio_;
+      event.pixel_ratio               = get_pixel_ratio(wd->physical_width_, wd->physical_height_, wd->screen_width_, wd->screen_height_);
 
       auto success = FlutterEngineSendWindowMetricsEvent(wd->engine_, &event) == kSuccess;
 
-      FLWAY_LOG << "shell.configure: " << width << "x" << height << " status: " << (success ? "success" : "failed") << std::endl;
+      FLWAY_LOG << "shell.configure: " << event.width << "x" << event.height << " par: " << event.pixel_ratio << " status: " << (success ? "success" : "failed") << std::endl;
     },
 
     .popup_done = [](void *data, struct wl_shell_surface *wl_shell_surface) -> void {
@@ -317,10 +327,11 @@ const wl_output_listener WaylandDisplay::kOutputListener = {
         [](void *data, struct wl_output *wl_output, int32_t x, int32_t y, int32_t physical_width, int32_t physical_height, int32_t subpixel, const char *make, const char *model, int32_t transform) {
           WaylandDisplay *const wd = get_wayland_display(data);
 
-          wd->pixel_ratio_ = (double)physical_width / physical_height;
+          wd->physical_width_  = physical_width;
+          wd->physical_height_ = physical_height;
 
-          printf("output.geometry(data:%p, wl_output:%p, x:%d, y:%d, physical_width:%d, physical_height:%d, pixel_ratio_:%.2f, subpixel:%d, make:%s, model:%s, transform:%d)\n", data, wl_output, x, y, physical_width, physical_height,
-                 wd->pixel_ratio_, subpixel, make, model, transform);
+          printf("output.geometry(data:%p, wl_output:%p, x:%d, y:%d, physical_width:%d, physical_height:%d, subpixel:%d, make:%s, model:%s, transform:%d)\n", data, wl_output, x, y, physical_width, physical_height, subpixel, make, model,
+                 transform);
         },
     .mode =
         [](void *data, struct wl_output *wl_output, uint32_t flags, int32_t width, int32_t height, int32_t refresh) {
@@ -333,15 +344,15 @@ const wl_output_listener WaylandDisplay::kOutputListener = {
             event.struct_size               = sizeof(event);
             event.width                     = (wd->screen_width_ = width);
             event.height                    = (wd->screen_height_ = height);
-            event.pixel_ratio               = wd->pixel_ratio_;
+            event.pixel_ratio               = get_pixel_ratio(wd->physical_width_, wd->physical_height_, wd->screen_width_, wd->screen_height_);
 
             auto success = FlutterEngineSendWindowMetricsEvent(wd->engine_, &event) == kSuccess;
 
             wl_egl_window_resize(wd->window_, wd->screen_width_, wd->screen_height_, 0, 0);
 
-            FLWAY_LOG << "Window resized: " << event.width << "x" << event.height << " status: " << (success ? "success" : "failed") << std::endl;
+            FLWAY_LOG << "Window resized: " << event.width << "x" << event.height << " par: " << event.pixel_ratio << " status: " << (success ? "success" : "failed") << std::endl;
           } else {
-            wd->pixel_ratio_skipped_ = true;
+            wd->window_metrix_skipped_ = true;
             FLWAY_LOG << "Window resized: " << wd->screen_width_ << "x" << wd->screen_width_ << " status: "
                       << "skipped" << std::endl;
           }
@@ -503,17 +514,17 @@ bool WaylandDisplay::SetupEngine(const std::string &bundle_path, const std::vect
     return false;
   }
 
-  if (pixel_ratio_skipped_) {
+  if (window_metrix_skipped_) {
     FlutterWindowMetricsEvent event = {};
 
     event.struct_size = sizeof(event);
     event.width       = screen_width_;
     event.height      = screen_height_;
-    event.pixel_ratio = pixel_ratio_;
+    event.pixel_ratio = get_pixel_ratio(physical_width_, physical_height_, screen_width_, screen_height_);
 
     const auto success = FlutterEngineSendWindowMetricsEvent(engine_, &event) == kSuccess;
 
-    FLWAY_LOG << "Window metric: " << event.width << "x" << event.height << " status: " << (success ? "success" : "failed") << std::endl;
+    FLWAY_LOG << "Window metric: " << event.width << "x" << event.height << " par: " << event.pixel_ratio << " status: " << (success ? "success" : "failed") << std::endl;
 
     return success;
   }
