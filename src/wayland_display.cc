@@ -432,7 +432,7 @@ void WaylandDisplay::ProcessWaylandEvents(uv_poll_t* handle,
 
 void WaylandDisplay::SignalHandler(int signum) {
   SPDLOG_INFO("signum = {}", signum);
-  if (signum == SIGINT) {
+  if (signum == SIGINT || signum == SIGTERM) {
     uv_async_send(signal_event_async_);
   }
 }
@@ -450,6 +450,8 @@ bool WaylandDisplay::Run() {
   }
 
   signal(SIGINT,
+         cify([self = this](int signum) { self->SignalHandler(signum); }));
+  signal(SIGTERM,
          cify([self = this](int signum) { self->SignalHandler(signum); }));
 
   loop_ = new uv_loop_t;
