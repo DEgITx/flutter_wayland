@@ -208,6 +208,7 @@ void WaylandDisplay::KeyboardHandleRepeat(uv_timer_t* handle) {
 
     for (auto listener = kEventListeners.begin();
          listener != kEventListeners.end(); ++listener) {
+      (*listener)->OnKeyboardKey(evdev_keycode, xkb_keycode, utf32, false, mods);
       (*listener)->OnKeyboardKey(evdev_keycode, xkb_keycode, utf32, true, mods);
     }
   }
