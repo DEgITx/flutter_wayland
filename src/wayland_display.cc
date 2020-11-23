@@ -482,11 +482,20 @@ bool WaylandDisplay::SetupEngine(const std::string &bundle_path, const std::vect
   }
 
   FlutterProjectArgs args = {
-      .struct_size       = sizeof(FlutterProjectArgs),
-      .assets_path       = bundle_path.c_str(),
-      .icu_data_path     = icu_data_path.c_str(),
-      .command_line_argc = static_cast<int>(command_line_args_c.size()),
-      .command_line_argv = command_line_args_c.data(),
+      .struct_size                               = sizeof(FlutterProjectArgs),
+      .assets_path                               = bundle_path.c_str(),
+      .icu_data_path                             = icu_data_path.c_str(),
+      .command_line_argc                         = static_cast<int>(command_line_args_c.size()),
+      .command_line_argv                         = command_line_args_c.data(),
+      .compute_platform_resolved_locale_callback = [](const FlutterLocale **supported_locales, size_t number_of_locales) -> const FlutterLocale * {
+        printf("compute_platform_resolved_locale_callback: number_of_locales: %zu\n", number_of_locales);
+
+        if (number_of_locales > 0) {
+          return supported_locales[0];
+        }
+
+        return nullptr;
+      },
   };
 
   std::string libapp_aot_path = bundle_path + "/" + FlutterGetAppAotElfName(); // dw: TODO: There seems to be no convention name we could use, so let's temporary hardcode the path.
