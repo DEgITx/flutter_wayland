@@ -7,12 +7,17 @@
 #define WL_EGL_PLATFORM 1
 #endif
 
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+
 #include <chrono>
 #include <sstream>
 #include <vector>
 #include <functional>
 
 #include <dlfcn.h>
+#include <climits>
 #include <cstring>
 #include <cassert>
 #include <stdlib.h>
@@ -40,7 +45,7 @@ static double get_pixel_ratio(int32_t physical_width, int32_t physical_height, i
   return 1.0;
 }
 
-static inline WaylandDisplay *const get_wayland_display(void *data, const bool check_non_null = true) {
+static inline WaylandDisplay *get_wayland_display(void *data, const bool check_non_null = true) {
   WaylandDisplay *const wd = static_cast<WaylandDisplay *>(data);
 
   if (check_non_null) {
@@ -56,7 +61,7 @@ const wl_registry_listener WaylandDisplay::kRegistryListener = {
     .global = [](void *data, struct wl_registry *wl_registry, uint32_t name, const char *interface, uint32_t version) -> void {
       WaylandDisplay *const wd = get_wayland_display(data);
 
-      printf("AnnounceRegistryInterface(registry:%p, name:%2u, interface:%s, version:%u)\n", wl_registry, name, interface, version);
+      printf("AnnounceRegistryInterface(registry:%p, name:%2u, interface:%s, version:%u)\n", static_cast<void *>(wl_registry), name, interface, version);
 
       if (strcmp(interface, "wl_compositor") == 0) {
         wd->compositor_ = static_cast<decltype(compositor_)>(wl_registry_bind(wl_registry, name, &wl_compositor_interface, 1));
@@ -297,7 +302,7 @@ const wl_seat_listener WaylandDisplay::kSeatListener = {
           WaylandDisplay *const wd = get_wayland_display(data);
           assert(seat == wd->seat_);
 
-          printf("seat.capabilities(data:%p, seat:%p, capabilities:0x%x)\n", data, seat, capabilities);
+          printf("seat.capabilities(data:%p, seat:%p, capabilities:0x%x)\n", data, static_cast<void *>(seat), capabilities);
 
           if (capabilities & WL_SEAT_CAPABILITY_POINTER) {
             printf("seat.capabilities: pointer\n");
@@ -330,14 +335,16 @@ const wl_output_listener WaylandDisplay::kOutputListener = {
           wd->physical_width_  = physical_width;
           wd->physical_height_ = physical_height;
 
-          printf("output.geometry(data:%p, wl_output:%p, x:%d, y:%d, physical_width:%d, physical_height:%d, subpixel:%d, make:%s, model:%s, transform:%d)\n", data, wl_output, x, y, physical_width, physical_height, subpixel, make, model,
-                 transform);
+          printf("output.geometry(data:%p, wl_output:%p, x:%d, y:%d, physical_width:%d, physical_height:%d, subpixel:%d, make:%s, model:%s, transform:%d)\n", data, static_cast<void *>(wl_output), x, y, physical_width, physical_height,
+                 subpixel, make, model, transform);
         },
     .mode =
         [](void *data, struct wl_output *wl_output, uint32_t flags, int32_t width, int32_t height, int32_t refresh) {
           WaylandDisplay *const wd = get_wayland_display(data);
 
-          printf("output.mode(data:%p, wl_output:%p, flags:%d, width:%d->%d, height:%d->%d, refresh:%d)\n", data, wl_output, flags, wd->screen_width_, width, wd->screen_height_, height, refresh);
+          wd->vblank_time_ns_ = 1000000000000 / refresh;
+
+          printf("output.mode(data:%p, wl_output:%p, flags:%d, width:%d->%d, height:%d->%d, refresh:%d)\n", data, static_cast<void *>(wl_output), flags, wd->screen_width_, width, wd->screen_height_, height, refresh);
 
           if (wd->engine_) {
             FlutterWindowMetricsEvent event = {};
@@ -357,8 +364,8 @@ const wl_output_listener WaylandDisplay::kOutputListener = {
                       << "skipped" << std::endl;
           }
         },
-    .done  = [](void *data, struct wl_output *wl_output) { printf("output.done(data:%p, wl_output:%p)\n", data, wl_output); },
-    .scale = [](void *data, struct wl_output *wl_output, int32_t factor) { printf("output.scale(data:%p, wl_output:%p, factor:%d)\n", data, wl_output, factor); },
+    .done  = [](void *data, struct wl_output *wl_output) { printf("output.done(data:%p, wl_output:%p)\n", data, static_cast<void *>(wl_output)); },
+    .scale = [](void *data, struct wl_output *wl_output, int32_t factor) { printf("output.scale(data:%p, wl_output:%p, factor:%d)\n", data, static_cast<void *>(wl_output), factor); },
 };
 
 WaylandDisplay::WaylandDisplay(size_t width, size_t height, const std::string &bundle_path, const std::vector<std::string> &command_line_args)
@@ -367,6 +374,11 @@ WaylandDisplay::WaylandDisplay(size_t width, size_t height, const std::string &b
     , screen_height_(height) {
   if (screen_width_ == 0 || screen_height_ == 0) {
     FLWAY_ERROR << "Invalid screen dimensions." << std::endl;
+    return;
+  }
+
+  if (socketpair(AF_LOCAL, SOCK_DGRAM | SOCK_CLOEXEC, 0, &sv_[0]) == -1) {
+    FLWAY_ERROR << "socketpair() failed, errno: " << errno << std::endl;
     return;
   }
 
@@ -482,11 +494,25 @@ bool WaylandDisplay::SetupEngine(const std::string &bundle_path, const std::vect
   }
 
   FlutterProjectArgs args = {
-      .struct_size                               = sizeof(FlutterProjectArgs),
-      .assets_path                               = bundle_path.c_str(),
-      .icu_data_path                             = icu_data_path.c_str(),
-      .command_line_argc                         = static_cast<int>(command_line_args_c.size()),
-      .command_line_argv                         = command_line_args_c.data(),
+      .struct_size       = sizeof(FlutterProjectArgs),
+      .assets_path       = bundle_path.c_str(),
+      .icu_data_path     = icu_data_path.c_str(),
+      .command_line_argc = static_cast<int>(command_line_args_c.size()),
+      .command_line_argv = command_line_args_c.data(),
+      .vsync_callback    = [](void *data, intptr_t baton) -> void {
+        WaylandDisplay *const wd = get_wayland_display(data);
+
+        if (wd->baton_ != 0) {
+          printf("ERROR: vsync.wait: New baton arrived, but old was not sent.\n");
+          exit(1);
+        }
+
+        wd->baton_ = baton;
+
+        if (wd->sendNotifyData() != 1) {
+          exit(1);
+        }
+      },
       .compute_platform_resolved_locale_callback = [](const FlutterLocale **supported_locales, size_t number_of_locales) -> const FlutterLocale * {
         printf("compute_platform_resolved_locale_callback: number_of_locales: %zu\n", number_of_locales);
 
@@ -613,6 +639,67 @@ bool WaylandDisplay::IsValid() const {
   return valid_;
 }
 
+ssize_t WaylandDisplay::vSyncHandler() {
+  if (baton_ == 0) {
+    return 0;
+  }
+
+  const auto t_now_ns                      = FlutterEngineGetCurrentTime();
+  const uint64_t after_vsync_time_ns       = (t_now_ns - last_frame_) % vblank_time_ns_;
+  const uint64_t before_next_vsync_time_ns = vblank_time_ns_ - after_vsync_time_ns;
+  const uint64_t current_ns                = t_now_ns + before_next_vsync_time_ns;
+  const uint64_t finish_time_ns            = current_ns + vblank_time_ns_;
+  intptr_t baton                           = std::atomic_exchange(&baton_, 0);
+
+  const auto status = FlutterEngineOnVsync(engine_, baton, current_ns, finish_time_ns);
+
+  if (status != kSuccess) {
+    printf("[%ju]: ERROR: vsync.ntfy: FlutterEngineOnVsync failed(%d): baton: %p\n", t_now_ns, status, reinterpret_cast<void *>(baton));
+    return -1;
+  }
+
+  return 1;
+}
+
+const struct wl_callback_listener WaylandDisplay::kFrameListener = {.done = [](void *data, struct wl_callback *cb, uint32_t callback_data) {
+  WaylandDisplay *const wd = get_wayland_display(data);
+  wd->last_frame_          = FlutterEngineGetCurrentTime();
+
+  wl_callback_destroy(cb);
+  wl_callback_add_listener(wl_surface_frame(wd->surface_), &kFrameListener, data);
+}};
+
+ssize_t WaylandDisplay::readNotifyData() {
+  ssize_t rv;
+
+  do {
+    char c;
+    rv = read(sv_[SOCKET_READER], &c, sizeof c);
+  } while (rv == -1 && errno == EINTR);
+
+  if (rv != 1) {
+    printf("ERROR: Read error from vsync socket (rv: %zd, errno: %d)\n", rv, errno);
+  }
+
+  return rv;
+}
+
+ssize_t WaylandDisplay::sendNotifyData() {
+  static unsigned char c = 0;
+  ssize_t rv;
+
+  c++;
+
+  do {
+    rv = write(sv_[SOCKET_WRITER], &c, sizeof c);
+  } while (rv == -1 && errno == EINTR);
+  if (rv != 1) {
+    printf("ERROR: Write error to vsync socket (rv: %zd, errno: %d)\n", rv, errno);
+  }
+
+  return rv;
+}
+
 bool WaylandDisplay::Run() {
   if (!valid_) {
     FLWAY_ERROR << "Could not run an invalid display." << std::endl;
@@ -621,28 +708,61 @@ bool WaylandDisplay::Run() {
 
   const int fd = wl_display_get_fd(display_);
 
+  wl_callback_add_listener(wl_surface_frame(surface_), &kFrameListener, this);
+
   while (valid_) {
-    while (wl_display_prepare_read(display_) < 0) {
+    while (wl_display_prepare_read(display_) != 0) {
       wl_display_dispatch_pending(display_);
     }
 
     wl_display_flush(display_);
 
-    int rv;
-
     do {
-      struct pollfd fds = {.fd = fd, .events = POLLIN};
+      int rv;
 
-      rv = poll(&fds, 1, 1);
-    } while (rv == -1 && rv == EINTR);
+      struct pollfd fds[2] = {
+          {.fd = sv_[1], .events = POLLIN},
+          {.fd = fd, .events = POLLIN | POLLERR},
+      };
 
-    if (rv <= 0) {
-      wl_display_cancel_read(display_);
-    } else {
-      wl_display_read_events(display_);
-    }
+      do {
+        static const struct timespec ts = {
+            .tv_sec  = LONG_MAX,
+            .tv_nsec = 0,
+        };
 
-    wl_display_dispatch_pending(display_);
+        rv = ppoll(&fds[0], std::size(fds), &ts, nullptr);
+      } while (rv == -1 && rv == EINTR);
+
+      if (rv == -1) {
+        printf("ERROR: ppoll returned -1 (errno: %d)\n", errno);
+        return false;
+      }
+
+      if (fds[0].revents & POLLIN) {
+        auto rv = vSyncHandler();
+
+        if (rv != 1) {
+          return false;
+        }
+
+        rv = readNotifyData();
+
+        if (rv != 1) {
+          return false;
+        }
+
+        continue;
+      }
+
+      if (fds[1].revents & POLLIN) {
+        wl_display_read_events(display_);
+      } else {
+        wl_display_cancel_read(display_);
+      }
+
+      break;
+    } while (true);
   }
 
   return true;

@@ -100,7 +100,11 @@ bool FlutterSendMessage(FlutterEngine engine, const char *channel, const uint8_t
   FlutterPlatformMessageResponseHandle *response_handle = nullptr;
 
   FlutterPlatformMessage platform_message = {
-      sizeof(FlutterPlatformMessage), .channel = channel, .message = message, .message_size = message_size, .response_handle = response_handle,
+      .struct_size     = sizeof(FlutterPlatformMessage),
+      .channel         = channel,
+      .message         = message,
+      .message_size    = message_size,
+      .response_handle = response_handle,
   };
 
   FlutterEngineResult message_result = FlutterEngineSendPlatformMessage(engine, &platform_message);

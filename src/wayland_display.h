@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <atomic>
+#include <unistd.h>
 #include <EGL/egl.h>
 #include <wayland-client.h>
 #include <wayland-egl.h>
@@ -14,6 +16,7 @@
 
 #include <memory>
 #include <string>
+#include <sys/time.h>
 #include <sys/types.h>
 
 #include "macros.h"
@@ -48,6 +51,8 @@ private:
   struct xkb_context *xkb_context         = nullptr;
   GdkModifierType key_modifiers           = static_cast<GdkModifierType>(0);
 
+  static const struct wl_callback_listener kFrameListener;
+
   bool valid_ = false;
   int screen_width_;
   int screen_height_;
@@ -78,7 +83,18 @@ private:
 
   bool StopRunning();
 
-  FLWAY_DISALLOW_COPY_AND_ASSIGN(WaylandDisplay);
+  // vsync related {
+  std::atomic<intptr_t> baton_      = 0;
+  std::atomic<uint64_t> last_frame_ = 0;
+  uint64_t vblank_time_ns_          = 1000000000000 / 60000;
+  ssize_t vSyncHandler();
+  enum { SOCKET_WRITER = 0, SOCKET_READER };
+  int sv_[2] = {-1, -1}; // 0-index is for sending, 1-index is for reading
+  ssize_t sendNotifyData();
+  ssize_t readNotifyData();
+  // }
+
+  FLWAY_DISALLOW_COPY_AND_ASSIGN(WaylandDisplay)
 };
 
 } // namespace flutter

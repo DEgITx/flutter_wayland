@@ -44,7 +44,7 @@ GdkModifierType toGDKModifiers(struct xkb_keymap *xkb_keymap, guint32 mods) {
 
   guint state = 0;
 
-  for (auto i = 0; i < std::size(table); i++) {
+  for (size_t i = 0; i < std::size(table); i++) {
     if (mods & (1 << xkb_keymap_mod_get_index(xkb_keymap, table[i].xkb_name)))
       state |= table[i].gdk_mask;
   }

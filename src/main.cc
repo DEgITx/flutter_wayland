@@ -75,9 +75,7 @@ static bool Main(std::vector<std::string> args) {
   //   return false;
   // }
 
-  display.Run();
-
-  return true;
+  return display.Run();
 }
 
 } // namespace flutter
