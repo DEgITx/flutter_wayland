@@ -84,6 +84,12 @@ const wl_registry_listener WaylandDisplay::kRegistryListener = {
         wl_output_add_listener(wd->output_, &kOutputListener, wd);
         return;
       }
+
+      if (strcmp(interface, wp_presentation_interface.name) == 0) {
+        wd->presentation_ = static_cast<decltype(presentation_)>(wl_registry_bind(wl_registry, name, &wp_presentation_interface, 1));
+        wp_presentation_add_listener(wd->presentation_, &kPresentationListener, wd);
+        return;
+      }
     },
 
     .global_remove = [](void *data, struct wl_registry *wl_registry, uint32_t name) -> void {
@@ -366,6 +372,30 @@ const wl_output_listener WaylandDisplay::kOutputListener = {
         },
     .done  = [](void *data, struct wl_output *wl_output) { printf("output.done(data:%p, wl_output:%p)\n", data, static_cast<void *>(wl_output)); },
     .scale = [](void *data, struct wl_output *wl_output, int32_t factor) { printf("output.scale(data:%p, wl_output:%p, factor:%d)\n", data, static_cast<void *>(wl_output), factor); },
+};
+
+const struct wp_presentation_feedback_listener WaylandDisplay::kPresentationFeedbackListener = {
+    .sync_output = [](void *data, struct wp_presentation_feedback *wp_presentation_feedback, struct wl_output *output) {},
+    .presented =
+        [](void *data, struct wp_presentation_feedback *wp_presentation_feedback, uint32_t tv_sec_hi, uint32_t tv_sec_lo, uint32_t tv_nsec, uint32_t refresh, uint32_t seq_hi, uint32_t seq_lo, uint32_t flags) {
+          WaylandDisplay *const wd = get_wayland_display(data);
+          wp_presentation_feedback_add_listener(::wp_presentation_feedback(wd->presentation_, wd->surface_), &kPresentationFeedbackListener, data);
+        },
+    .discarded =
+        [](void *data, struct wp_presentation_feedback *wp_presentation_feedback) {
+          WaylandDisplay *const wd = get_wayland_display(data);
+          wp_presentation_feedback_add_listener(::wp_presentation_feedback(wd->presentation_, wd->surface_), &kPresentationFeedbackListener, data);
+        },
+}; // namespace flutter
+
+const struct wp_presentation_listener WaylandDisplay::kPresentationListener = {
+    .clock_id =
+        [](void *data, struct wp_presentation *wp_presentation, uint32_t clk_id) {
+          WaylandDisplay *const wd = get_wayland_display(data);
+
+          wd->presentation_clk_id_ = clk_id;
+          wp_presentation_feedback_add_listener(::wp_presentation_feedback(wd->presentation_, wd->surface_), &kPresentationFeedbackListener, data);
+        },
 };
 
 WaylandDisplay::WaylandDisplay(size_t width, size_t height, const std::string &bundle_path, const std::vector<std::string> &command_line_args)

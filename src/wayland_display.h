@@ -18,6 +18,7 @@
 #include <string>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <wayland-presentation-time-client-protocol.h>
 
 #include "macros.h"
 
@@ -36,11 +37,13 @@ public:
 private:
   static const wl_registry_listener kRegistryListener;
   static const wl_shell_surface_listener kShellSurfaceListener;
-
   static const wl_seat_listener kSeatListener;
   static const wl_output_listener kOutputListener;
-
   static const wl_pointer_listener kPointerListener;
+  static const wl_callback_listener kFrameListener;
+  static const wp_presentation_listener kPresentationListener;
+  static const wp_presentation_feedback_listener kPresentationFeedbackListener;
+
   double surface_x = 0;
   double surface_y = 0;
 
@@ -50,8 +53,6 @@ private:
   struct xkb_keymap *keymap               = nullptr;
   struct xkb_context *xkb_context         = nullptr;
   GdkModifierType key_modifiers           = static_cast<GdkModifierType>(0);
-
-  static const struct wl_callback_listener kFrameListener;
 
   bool valid_ = false;
   int screen_width_;
@@ -65,6 +66,7 @@ private:
   wl_shell *shell_                 = nullptr;
   wl_seat *seat_                   = nullptr;
   wl_output *output_               = nullptr;
+  wp_presentation *presentation_   = nullptr;
   wl_shell_surface *shell_surface_ = nullptr;
   wl_surface *surface_             = nullptr;
   wl_egl_window *window_           = nullptr;
@@ -84,6 +86,7 @@ private:
   bool StopRunning();
 
   // vsync related {
+  uint32_t presentation_clk_id_     = UINT32_MAX;
   std::atomic<intptr_t> baton_      = 0;
   std::atomic<uint64_t> last_frame_ = 0;
   uint64_t vblank_time_ns_          = 1000000000000 / 60000;

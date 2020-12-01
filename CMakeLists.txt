@@ -2,11 +2,16 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+
 cmake_minimum_required(VERSION 3.3)
 
 project(flutter-launcher-wayland)
 
 find_package(PkgConfig)
+find_package(ECM REQUIRED NO_MODULE)
+set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH})
+find_package(WaylandScanner REQUIRED)
+find_package(WaylandProtocols REQUIRED)
 pkg_search_module(XKB xkbcommon REQUIRED)
 pkg_search_module(EGL egl REQUIRED)
 pkg_search_module(WAYLAND_CLIENT wayland-client REQUIRED)
@@ -39,6 +44,12 @@ set(SOURCES
     src/wayland_display.h
 )
 
+ecm_add_wayland_client_protocol(
+    SOURCES
+    PROTOCOL "${CMAKE_SYSROOT}${WaylandProtocols_DATADIR}/stable/presentation-time/presentation-time.xml"
+    BASENAME "presentation-time"
+)
+
 link_directories(
     ${XKB_LIBRARY_DIRS}
     ${EGL_LIBRARY_DIRS}
@@ -53,6 +64,8 @@ target_compile_definitions(flutter-launcher-wayland PRIVATE "-DGLFW_INCLUDE_ES2"
 
 target_include_directories(flutter-launcher-wayland
   PRIVATE
+  ${CMAKE_CURRENT_BINARY_DIR}
+  ${GLFW_INCLUDE_DIRS}
   ${GLFW_INCLUDE_DIRS}
   ${XKB_INCLUDE_DIRS}
   ${EGL_INCLUDE_DIRS}
