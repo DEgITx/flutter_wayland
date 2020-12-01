@@ -46,7 +46,7 @@ set(SOURCES
 
 ecm_add_wayland_client_protocol(
     SOURCES
-    PROTOCOL "${CMAKE_SYSROOT}${WaylandProtocols_DATADIR}/stable/presentation-time/presentation-time.xml"
+    PROTOCOL "${WaylandProtocols_DATADIR}/stable/presentation-time/presentation-time.xml"
     BASENAME "presentation-time"
 )
 
