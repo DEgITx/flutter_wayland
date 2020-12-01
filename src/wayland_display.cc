@@ -721,7 +721,7 @@ bool WaylandDisplay::Run() {
       int rv;
 
       struct pollfd fds[2] = {
-          {.fd = sv_[1], .events = POLLIN},
+          {.fd = sv_[SOCKET_READER], .events = POLLIN},
           {.fd = fd, .events = POLLIN | POLLERR},
       };
 
