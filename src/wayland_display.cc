@@ -90,6 +90,11 @@ const wl_registry_listener WaylandDisplay::kRegistryListener = {
         wp_presentation_add_listener(wd->presentation_, &kPresentationListener, wd);
         return;
       }
+
+      if (strcmp(interface, zwp_xwayland_keyboard_grab_manager_v1_interface.name) == 0) {
+        wd->kbd_grab_manager_ = static_cast<decltype(kbd_grab_manager_)>(wl_registry_bind(wl_registry, name, &zwp_xwayland_keyboard_grab_manager_v1_interface, 1));
+        return;
+      }
     },
 
     .global_remove = [](void *data, struct wl_registry *wl_registry, uint32_t name) -> void {
@@ -741,6 +746,7 @@ ssize_t WaylandDisplay::sendNotifyData() {
   do {
     rv = write(sv_[SOCKET_WRITER], &c, sizeof c);
   } while (rv == -1 && errno == EINTR);
+
   if (rv != 1) {
     printf("ERROR: Write error to vsync socket (rv: %zd, errno: %d)\n", rv, errno);
   }
@@ -757,6 +763,12 @@ bool WaylandDisplay::Run() {
   const int fd = wl_display_get_fd(display_);
 
   wl_callback_add_listener(wl_surface_frame(surface_), &kFrameListener, this);
+
+  if (kbd_grab_manager_ && getEnv("FLUTTER_WAYLAND_MAIN_UI", 0.) != 0.) {
+    /* It's the main UI application, so check if we can receive all keys */
+    printf("kbd_grab_manager: grabbing keyboard...\n");
+    xwayland_keyboard_grab = zwp_xwayland_keyboard_grab_manager_v1_grab_keyboard(kbd_grab_manager_, surface_, seat_);
+  }
 
   while (valid_) {
     while (wl_display_prepare_read(display_) != 0) {

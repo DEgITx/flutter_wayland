@@ -5,10 +5,35 @@
 #include <sstream>
 #include <unistd.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "utils.h"
 
 namespace flutter {
+
+template <> std::string getEnv(const char *variable, std::string default_value) {
+  if (variable == nullptr) {
+    return default_value;
+  }
+
+  const char *str = getenv(variable);
+
+  if (str == nullptr) {
+    return default_value;
+  }
+
+  return std::string(str);
+}
+
+template <> double getEnv(char const *variable, double default_value) {
+  std::string val = getEnv(variable, std::string(""));
+
+  if (val.empty()) {
+    return default_value;
+  }
+
+  return atof(val.c_str());
+}
 
 std::string GetICUDataPath() {
   auto base_directory = GetExecutableDirectory();

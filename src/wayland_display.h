@@ -20,6 +20,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <wayland-presentation-time-client-protocol.h>
+#include <wayland-xwayland-keyboard-grab-client-protocol.h>
 
 #include "macros.h"
 
@@ -48,6 +49,8 @@ private:
   double surface_x = 0;
   double surface_y = 0;
 
+  struct zwp_xwayland_keyboard_grab_v1 *xwayland_keyboard_grab = nullptr;
+
   static const wl_keyboard_listener kKeyboardListener;
   wl_keyboard_keymap_format keymap_format = WL_KEYBOARD_KEYMAP_FORMAT_NO_KEYMAP;
   struct xkb_state *xkb_state             = nullptr;
@@ -58,22 +61,23 @@ private:
   bool valid_ = false;
   int screen_width_;
   int screen_height_;
-  int physical_width_              = 0;
-  int physical_height_             = 0;
-  bool window_metrix_skipped_      = false;
-  wl_display *display_             = nullptr;
-  wl_registry *registry_           = nullptr;
-  wl_compositor *compositor_       = nullptr;
-  wl_shell *shell_                 = nullptr;
-  wl_seat *seat_                   = nullptr;
-  wl_output *output_               = nullptr;
-  wp_presentation *presentation_   = nullptr;
-  wl_shell_surface *shell_surface_ = nullptr;
-  wl_surface *surface_             = nullptr;
-  wl_egl_window *window_           = nullptr;
-  EGLDisplay egl_display_          = EGL_NO_DISPLAY;
-  EGLSurface egl_surface_          = nullptr;
-  EGLContext egl_context_          = EGL_NO_CONTEXT;
+  int physical_width_                                      = 0;
+  int physical_height_                                     = 0;
+  bool window_metrix_skipped_                              = false;
+  wl_display *display_                                     = nullptr;
+  wl_registry *registry_                                   = nullptr;
+  wl_compositor *compositor_                               = nullptr;
+  wl_shell *shell_                                         = nullptr;
+  wl_seat *seat_                                           = nullptr;
+  wl_output *output_                                       = nullptr;
+  wp_presentation *presentation_                           = nullptr;
+  zwp_xwayland_keyboard_grab_manager_v1 *kbd_grab_manager_ = nullptr;
+  wl_shell_surface *shell_surface_                         = nullptr;
+  wl_surface *surface_                                     = nullptr;
+  wl_egl_window *window_                                   = nullptr;
+  EGLDisplay egl_display_                                  = EGL_NO_DISPLAY;
+  EGLSurface egl_surface_                                  = nullptr;
+  EGLContext egl_context_                                  = EGL_NO_CONTEXT;
 
   EGLSurface resource_egl_surface_ = nullptr;
   EGLContext resource_egl_context_ = EGL_NO_CONTEXT;

@@ -25,4 +25,5 @@ std::string FlutterGetAppAotElfName();
 
 bool FlutterSendMessage(FlutterEngine engine, const char *channel, const uint8_t *message, const size_t message_size);
 
+template <typename T> T getEnv(const char *variable, T default_value);
 } // namespace flutter

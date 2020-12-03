@@ -50,6 +50,12 @@ ecm_add_wayland_client_protocol(
     BASENAME "presentation-time"
 )
 
+ecm_add_wayland_client_protocol(
+    SOURCES
+    PROTOCOL "${WaylandProtocols_DATADIR}/unstable/xwayland-keyboard-grab/xwayland-keyboard-grab-unstable-v1.xml"
+    BASENAME "xwayland-keyboard-grab"
+)
+
 link_directories(
     ${XKB_LIBRARY_DIRS}
     ${EGL_LIBRARY_DIRS}
