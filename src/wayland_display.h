@@ -22,6 +22,8 @@
 #include <wayland-presentation-time-client-protocol.h>
 #include <wayland-xwayland-keyboard-grab-client-protocol.h>
 
+#include <uv.h>
+
 #include "macros.h"
 
 namespace flutter {
@@ -101,6 +103,24 @@ private:
   ssize_t sendNotifyData();
   ssize_t readNotifyData();
   // }
+
+  uv_loop_t* loop_ = nullptr;
+  uint64_t repeat_rate_ = 10;    // characters per second
+  uint64_t repeat_delay_ = 400;  // in milliseconds
+  uv_timer_t* key_repeat_timer_handle_ = nullptr;
+  
+  xkb_keycode_t last_hardware_keycode = 0;
+  xkb_keysym_t last_keysym = 0;
+  guint last_keystate = 0;
+  uint32_t last_utf32 = 0;
+  
+  void ProcessWaylandEvents(uv_poll_t* handle,
+                                          int status,
+                                          int events);
+  void ProcessNotifyEvents(uv_poll_t* handle,
+                                          int status,
+                                          int events);
+  void OnKeyboardKey(const GdkEventType type, const xkb_keycode_t hardware_keycode, const xkb_keysym_t keysym, guint state, const uint32_t utf32);
 
   FLWAY_DISALLOW_COPY_AND_ASSIGN(WaylandDisplay)
 };

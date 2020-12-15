@@ -17,6 +17,7 @@ pkg_search_module(EGL egl REQUIRED)
 pkg_search_module(WAYLAND_CLIENT wayland-client REQUIRED)
 pkg_search_module(WAYLAND_EGL wayland-egl REQUIRED)
 pkg_search_module(GDK gdk-3.0 REQUIRED) # dw: Not used for linking, we just need an access to the header
+pkg_search_module(UV libuv REQUIRED)
 # If you do not have flutter-engine.pc file
 # just provide all FLUTTER_ENGINE* variables using -D
 pkg_search_module(FLUTTER_ENGINE flutter-engine)
@@ -36,6 +37,7 @@ set(SOURCES
     src/egl_utils.cc
     src/utils.cc
     src/wayland_display.cc
+    src/cify.h
     src/elf.h
     src/macros.h
     src/keys.h
@@ -79,6 +81,8 @@ target_include_directories(flutter-launcher-wayland
   ${WAYLAND_EGL_INCLUDE_DIRS}
   ${GDK_INCLUDE_DIRS}
   ${FLUTTER_ENGINE_INCLUDE_DIRS}
+  ${UV_INCLUDE_DIRS}
+  ${EXTERNAL_INCLUDE_DIRS}
 )
 
 target_link_libraries(flutter-launcher-wayland
@@ -88,6 +92,8 @@ target_link_libraries(flutter-launcher-wayland
   ${WAYLAND_CLIENT_LIBRARIES}
   ${WAYLAND_EGL_LIBRARIES}
   ${FLUTTER_ENGINE_LIBRARIES}
+  ${UV_LIBRARIES}
+  ${EXTERNAL_LIBRARIES}
 )
 
 install(TARGETS flutter-launcher-wayland DESTINATION bin)

@@ -27,6 +27,7 @@
 #include <sys/mman.h>
 #include <linux/input-event-codes.h>
 
+#include "cify.h"
 #include "elf.h"
 #include "keys.h"
 #include "utils.h"
@@ -74,7 +75,7 @@ const wl_registry_listener WaylandDisplay::kRegistryListener = {
       }
 
       if (strcmp(interface, "wl_seat") == 0) {
-        wd->seat_ = static_cast<decltype(seat_)>(wl_registry_bind(wl_registry, name, &wl_seat_interface, 1));
+        wd->seat_ = static_cast<decltype(seat_)>(wl_registry_bind(wl_registry, name, &wl_seat_interface, 4));
         wl_seat_add_listener(wd->seat_, &kSeatListener, wd);
         return;
       }
@@ -258,43 +259,28 @@ const wl_keyboard_listener WaylandDisplay::kKeyboardListener = {
 
           const uint32_t utf32 = xkb_keysym_to_utf32(keysym); // TODO: double check if it fully mimics gdk_keyval_to_unicode()
 
-          if (utf32) {
-            if (utf32 >= 0x21 && utf32 <= 0x7E) {
-              printf("the key %c was %s\n", (char)utf32, type == GDK_KEY_PRESS ? "pressed" : "released");
-            } else {
-              printf("the key U+%04X was %s\n", utf32, type == GDK_KEY_PRESS ? "pressed" : "released");
-            }
-          } else {
-            char name[64];
-            xkb_keysym_get_name(keysym, name, sizeof(name));
+          if (wd->key_repeat_timer_handle_) {
+            if (type == GDK_KEY_PRESS &&
+                xkb_keymap_key_repeats(wd->keymap, hardware_keycode) == 1) {
 
-            printf("the key %s was %s\n", name, type == GDK_KEY_PRESS ? "pressed" : "released");
-          }
+              wd->last_hardware_keycode = hardware_keycode;
+              wd->last_keysym = keysym;
+              wd->last_keystate = state;
+              wd->last_utf32 = utf32;
 
-          std::string message;
-
-          // dw: if you do not like so many backslashes,
-          // please consider to rerwite it using RapidJson.
-          message += "{";
-          message += " \"type\":" + std::string(type == GDK_KEY_PRESS ? "\"keydown\"" : "\"keyup\"");
-          message += ",\"keymap\":" + std::string("\"linux\"");
-          message += ",\"scanCode\":" + std::to_string(hardware_keycode);
-          message += ",\"toolkit\":" + std::string("\"gtk\"");
-          message += ",\"keyCode\":" + std::to_string(keysym);
-          message += ",\"modifiers\":" + std::to_string(state);
-          if (utf32) {
-            message += ",\"unicodeScalarValues\":" + std::to_string(utf32);
-          }
-
-          message += "}";
-
-          if (!message.empty()) {
-            bool success = FlutterSendMessage(wd->engine_, "flutter/keyevent", reinterpret_cast<const uint8_t *>(message.c_str()), message.size());
-
-            if (!success) {
-              FLWAY_ERROR << "Error sending PlatformMessage: " << message << std::endl;
+              uv_timer_start(wd->key_repeat_timer_handle_,
+                            cify([wd](uv_timer_t* handle) {
+                              wd->OnKeyboardKey(GDK_KEY_RELEASE, wd->last_hardware_keycode, wd->last_keysym, wd->last_keystate, wd->last_utf32);
+                              wd->OnKeyboardKey(GDK_KEY_PRESS, wd->last_hardware_keycode, wd->last_keysym, wd->last_keystate, wd->last_utf32);
+                            }),
+                            wd->repeat_delay_, 1000 / wd->repeat_rate_);
+            } else if (state == WL_KEYBOARD_KEY_STATE_RELEASED &&
+                   hardware_keycode == wd->last_hardware_keycode) {
+              uv_timer_stop(wd->key_repeat_timer_handle_);
             }
           }
+
+          wd->OnKeyboardKey(type, hardware_keycode, keysym, state, utf32);
         },
 
     .modifiers =
@@ -304,8 +290,54 @@ const wl_keyboard_listener WaylandDisplay::kKeyboardListener = {
           xkb_state_update_mask(wd->xkb_state, mods_depressed, mods_latched, mods_locked, group, 0, 0);
         },
 
-    .repeat_info = [](void *data, struct wl_keyboard *wl_keyboard, int32_t rate, int32_t delay) {},
+    .repeat_info = [](void *data, struct wl_keyboard *wl_keyboard, int32_t rate, int32_t delay) {
+      WaylandDisplay *const wd = get_wayland_display(data);
+      printf("wayland keyboard repeat_info rate = %d delay = %d\n", rate, delay);
+      wd->repeat_rate_ = rate;
+      wd->repeat_delay_ = delay;
+    },
 };
+
+void WaylandDisplay::OnKeyboardKey(const GdkEventType type, const xkb_keycode_t hardware_keycode, const xkb_keysym_t keysym, guint state, const uint32_t utf32)
+{
+  if (utf32) {
+    if (utf32 >= 0x21 && utf32 <= 0x7E) {
+      printf("the key %c was %s\n", (char)utf32, type == GDK_KEY_PRESS ? "pressed" : "released");
+    } else {
+      printf("the key U+%04X was %s\n", utf32, type == GDK_KEY_PRESS ? "pressed" : "released");
+    }
+  } else {
+    char name[64];
+    xkb_keysym_get_name(keysym, name, sizeof(name));
+
+    printf("the key %s was %s\n", name, type == GDK_KEY_PRESS ? "pressed" : "released");
+  }
+
+  std::string message;
+
+  // dw: if you do not like so many backslashes,
+  // please consider to rerwite it using RapidJson.
+  message += "{";
+  message += " \"type\":" + std::string(type == GDK_KEY_PRESS ? "\"keydown\"" : "\"keyup\"");
+  message += ",\"keymap\":" + std::string("\"linux\"");
+  message += ",\"scanCode\":" + std::to_string(hardware_keycode);
+  message += ",\"toolkit\":" + std::string("\"gtk\"");
+  message += ",\"keyCode\":" + std::to_string(keysym);
+  message += ",\"modifiers\":" + std::to_string(state);
+  if (utf32) {
+    message += ",\"unicodeScalarValues\":" + std::to_string(utf32);
+  }
+
+  message += "}";
+
+  if (!message.empty()) {
+    bool success = FlutterSendMessage(engine_, "flutter/keyevent", reinterpret_cast<const uint8_t *>(message.c_str()), message.size());
+
+    if (!success) {
+      FLWAY_ERROR << "Error sending PlatformMessage: " << message << std::endl;
+    }
+  }
+}
 
 const wl_seat_listener WaylandDisplay::kSeatListener = {
     .capabilities =
@@ -697,7 +729,7 @@ ssize_t WaylandDisplay::vSyncHandler() {
   const uint64_t before_next_vsync_time_ns = vblank_time_ns_ - after_vsync_time_ns;
   const uint64_t current_ns                = t_now_ns + before_next_vsync_time_ns;
   const uint64_t finish_time_ns            = current_ns + vblank_time_ns_;
-  intptr_t baton                           = std::atomic_exchange(&baton_, 0);
+  intptr_t baton                           = baton_.exchange(0);
 
   const auto status = FlutterEngineOnVsync(engine_, baton, current_ns, finish_time_ns);
 
@@ -754,13 +786,41 @@ ssize_t WaylandDisplay::sendNotifyData() {
   return rv;
 }
 
+void WaylandDisplay::ProcessWaylandEvents(uv_poll_t* handle,
+                                          int status,
+                                          int events) {
+
+  wl_display_dispatch(display_);
+}
+
+void WaylandDisplay::ProcessNotifyEvents(uv_poll_t* handle,
+                                          int status,
+                                          int events) {
+  auto rv = readNotifyData();
+
+  if (rv != 1) {
+    FLWAY_ERROR << "Can't read notify data" << std::endl;
+    return;
+  }
+
+  if (presentation_clk_id_ != UINT32_MAX && presentation_ != nullptr) {
+    wp_presentation_feedback_add_listener(::wp_presentation_feedback(presentation_, surface_), &kPresentationFeedbackListener, this);
+    wl_display_dispatch_pending(display_);
+  }
+
+  rv = vSyncHandler();
+
+  if (rv != 1) {
+    FLWAY_ERROR << "VSync failed" << std::endl;
+    return;
+  }
+}
+
 bool WaylandDisplay::Run() {
   if (!valid_) {
     FLWAY_ERROR << "Could not run an invalid display." << std::endl;
     return false;
   }
-
-  const int fd = wl_display_get_fd(display_);
 
   wl_callback_add_listener(wl_surface_frame(surface_), &kFrameListener, this);
 
@@ -770,68 +830,43 @@ bool WaylandDisplay::Run() {
     xwayland_keyboard_grab = zwp_xwayland_keyboard_grab_manager_v1_grab_keyboard(kbd_grab_manager_, surface_, seat_);
   }
 
-  while (valid_) {
-    while (wl_display_prepare_read(display_) != 0) {
-      wl_display_dispatch_pending(display_);
-    }
+  loop_ = new uv_loop_t;
+  uv_loop_init(loop_);
 
-    wl_display_flush(display_);
+  uv_poll_t* wl_events_poll_handle_display = new uv_poll_t;
+  uv_poll_init(loop_, wl_events_poll_handle_display, wl_display_get_fd(display_));
+  uv_poll_start(wl_events_poll_handle_display, UV_READABLE,
+    cify([self = this](uv_poll_t* handle, int status, int events) {
+      self->ProcessWaylandEvents(handle, status, events);
+    })
+  );
 
-    do {
-      int rv;
+  uv_poll_t* wl_events_poll_handle_notify = new uv_poll_t;
+  uv_poll_init(loop_, wl_events_poll_handle_notify, sv_[SOCKET_READER]);
+  uv_poll_start(wl_events_poll_handle_notify, UV_READABLE,
+    cify([self = this](uv_poll_t* handle, int status, int events) {
+      self->ProcessNotifyEvents(handle, status, events);
+    })
+  );
 
-      struct pollfd fds[2] = {
-          {.fd = sv_[SOCKET_READER], .events = POLLIN},
-          {.fd = fd, .events = POLLIN | POLLERR},
-      };
+  key_repeat_timer_handle_ = new uv_timer_t;
+  uv_timer_init(loop_, key_repeat_timer_handle_);
 
-      do {
-        static const struct timespec ts = {
-            .tv_sec  = LONG_MAX,
-            .tv_nsec = 0,
-        };
+  wl_display_dispatch_pending(display_);
+  uv_run(loop_, UV_RUN_DEFAULT);
 
-        rv = ppoll(&fds[0], std::size(fds), &ts, nullptr);
-      } while (rv == -1 && rv == EINTR);
+  uv_timer_stop(key_repeat_timer_handle_);
+  delete key_repeat_timer_handle_;
 
-      if (rv == -1) {
-        printf("ERROR: ppoll returned -1 (errno: %d)\n", errno);
-        return false;
-      }
+  uv_poll_stop(wl_events_poll_handle_notify);
+  delete wl_events_poll_handle_notify;
 
-      if (fds[0].revents & POLLIN) {
-        auto rv = readNotifyData();
+  uv_poll_stop(wl_events_poll_handle_display);
+  delete wl_events_poll_handle_display;
 
-        if (rv != 1) {
-          return false;
-        }
-
-        if (presentation_clk_id_ != UINT32_MAX && presentation_ != nullptr) {
-          wp_presentation_feedback_add_listener(::wp_presentation_feedback(presentation_, surface_), &kPresentationFeedbackListener, this);
-          wl_display_dispatch_pending(display_);
-        }
-
-        rv = vSyncHandler();
-
-        if (rv != 1) {
-          return false;
-        }
-
-        continue;
-      }
-
-      if (fds[1].revents & POLLIN) {
-        wl_display_read_events(display_);
-      } else {
-        wl_display_cancel_read(display_);
-      }
-
-      break;
-    } while (true);
-
-    wl_display_dispatch_pending(display_);
-  }
-
+  uv_loop_close(loop_);
+  delete loop_;
+  
   return true;
 }
 
