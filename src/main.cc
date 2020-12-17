@@ -85,5 +85,11 @@ int main(int argc, char *argv[]) {
   for (int i = 0; i < argc; ++i) {
     args.push_back(argv[i]);
   }
-  return flutter::Main(std::move(args)) ? EXIT_SUCCESS : EXIT_FAILURE;
+  bool status = flutter::Main(std::move(args));
+  if(status) {
+    printf("application closed succesfully\n");
+  } else {
+    FLWAY_ERROR << "application closed with error" << std::endl;
+  }
+  return status ? EXIT_SUCCESS : EXIT_FAILURE;
 }

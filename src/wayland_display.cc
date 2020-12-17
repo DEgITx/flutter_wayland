@@ -816,6 +816,22 @@ void WaylandDisplay::ProcessNotifyEvents(uv_poll_t* handle,
   }
 }
 
+void WaylandDisplay::SignalHandler(int signum) {
+  if(application_stopping_)
+    return;
+
+  printf("stop signal = %d\n", signum);
+  
+  if (signum == SIGINT || signum == SIGTERM) {
+    application_stopping_ = true;
+    uv_async_send(signal_event_async_);
+  }
+}
+
+void WaylandDisplay::AsyncSignalHandler(uv_async_t* handle) {
+  uv_stop(loop_);
+}
+
 bool WaylandDisplay::Run() {
   if (!valid_) {
     FLWAY_ERROR << "Could not run an invalid display." << std::endl;
@@ -829,6 +845,11 @@ bool WaylandDisplay::Run() {
     printf("kbd_grab_manager: grabbing keyboard...\n");
     xwayland_keyboard_grab = zwp_xwayland_keyboard_grab_manager_v1_grab_keyboard(kbd_grab_manager_, surface_, seat_);
   }
+
+  signal(SIGINT,
+         cify([self = this](int signum) { self->SignalHandler(signum); }));
+  signal(SIGTERM,
+         cify([self = this](int signum) { self->SignalHandler(signum); }));
 
   loop_ = new uv_loop_t;
   uv_loop_init(loop_);
@@ -849,6 +870,12 @@ bool WaylandDisplay::Run() {
     })
   );
 
+  signal_event_async_ = new uv_async_t;
+  uv_async_init(loop_, signal_event_async_,
+                cify([self = this](uv_async_t* handle) {
+                  self->AsyncSignalHandler(handle);
+                }));
+
   key_repeat_timer_handle_ = new uv_timer_t;
   uv_timer_init(loop_, key_repeat_timer_handle_);
 
@@ -857,6 +884,9 @@ bool WaylandDisplay::Run() {
 
   uv_timer_stop(key_repeat_timer_handle_);
   delete key_repeat_timer_handle_;
+
+  uv_close((uv_handle_t*)signal_event_async_, NULL);
+  delete signal_event_async_;
 
   uv_poll_stop(wl_events_poll_handle_notify);
   delete wl_events_poll_handle_notify;

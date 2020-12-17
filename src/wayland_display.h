@@ -105,6 +105,8 @@ private:
   // }
 
   uv_loop_t* loop_ = nullptr;
+  uv_async_t* signal_event_async_ = nullptr;
+  bool application_stopping_ = false;
   uint64_t repeat_rate_ = 10;    // characters per second
   uint64_t repeat_delay_ = 400;  // in milliseconds
   uv_timer_t* key_repeat_timer_handle_ = nullptr;
@@ -113,7 +115,9 @@ private:
   xkb_keysym_t last_keysym = 0;
   guint last_keystate = 0;
   uint32_t last_utf32 = 0;
-  
+
+  void SignalHandler(int signum);
+  void AsyncSignalHandler(uv_async_t* handle);
   void ProcessWaylandEvents(uv_poll_t* handle,
                                           int status,
                                           int events);
