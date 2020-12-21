@@ -28,23 +28,12 @@
 #include <linux/input-event-codes.h>
 
 #include "cify.h"
-#include "elf.h"
 #include "keys.h"
 #include "utils.h"
 #include "egl_utils.h"
 #include "wayland_display.h"
 
 namespace flutter {
-
-static double get_pixel_ratio(int32_t physical_width, int32_t physical_height, int32_t pixels_width, int32_t pixels_height) {
-
-  if (pixels_width == 0 || physical_height == 0 || pixels_width == 0 || pixels_height == 0) {
-    return 1.0;
-  }
-
-  // TODO
-  return 1.0;
-}
 
 static inline WaylandDisplay *get_wayland_display(void *data, const bool check_non_null = true) {
   WaylandDisplay *const wd = static_cast<WaylandDisplay *>(data);
@@ -120,16 +109,7 @@ const wl_shell_surface_listener WaylandDisplay::kShellSurfaceListener = {
         return;
 
       wl_egl_window_resize(wd->window_, wd->screen_width_ = width, wd->screen_height_ = height, 0, 0);
-
-      FlutterWindowMetricsEvent event = {};
-      event.struct_size               = sizeof(event);
-      event.width                     = wd->screen_width_;
-      event.height                    = wd->screen_height_;
-      event.pixel_ratio               = get_pixel_ratio(wd->physical_width_, wd->physical_height_, wd->screen_width_, wd->screen_height_);
-
-      auto success = FlutterEngineSendWindowMetricsEvent(wd->engine_, &event) == kSuccess;
-
-      FLWAY_LOG << "shell.configure: " << event.width << "x" << event.height << " par: " << event.pixel_ratio << " status: " << (success ? "success" : "failed") << std::endl;
+      wd->application->sendWindowMetrics(wd->physical_width_, wd->physical_height_, wd->screen_width_, wd->screen_height_);
     },
 
     .popup_done = [](void *data, struct wl_shell_surface *wl_shell_surface) -> void {
@@ -160,24 +140,15 @@ const wl_pointer_listener WaylandDisplay::kPointerListener = {
         [](void *data, struct wl_pointer *wl_pointer, uint32_t serial, uint32_t time, uint32_t button, uint32_t state) {
           WaylandDisplay *const wd = get_wayland_display(data);
 
-          uint32_t button_number = button - BTN_LEFT;
-          button_number          = button_number == 1 ? 2 : button_number == 2 ? 1 : button_number;
+          // uint32_t button_number = button - BTN_LEFT;
+          // button_number          = button_number == 1 ? 2 : button_number == 2 ? 1 : button_number;
 
-          FlutterPointerEvent event = {
-              .struct_size    = sizeof(event),
-              .phase          = state == WL_POINTER_BUTTON_STATE_PRESSED ? FlutterPointerPhase::kDown : FlutterPointerPhase::kUp,
-              .timestamp      = time * 1000,
-              .x              = wl_fixed_to_double(wd->surface_x),
-              .y              = wl_fixed_to_double(wd->surface_y),
-              .device         = 0,
-              .signal_kind    = kFlutterPointerSignalKindNone,
-              .scroll_delta_x = 0,
-              .scroll_delta_y = 0,
-              .device_kind    = static_cast<FlutterPointerDeviceKind>(0), // dw: TODO: Why kFlutterPointerDeviceKindMouse does not work?
-              .buttons        = 0,
-          };
-
-          FlutterEngineSendPointerEvent(wd->engine_, &event, 1);
+          wd->application->onPointerEvent(
+            state == WL_POINTER_BUTTON_STATE_PRESSED ? FlutterPointerPhase::kDown : FlutterPointerPhase::kUp,
+            time,
+            wl_fixed_to_double(wd->surface_x),
+            wl_fixed_to_double(wd->surface_y)
+          );
         },
 
     .axis = [](void *data, struct wl_pointer *wl_pointer, uint32_t time, uint32_t axis, wl_fixed_t value) {},
@@ -270,8 +241,8 @@ const wl_keyboard_listener WaylandDisplay::kKeyboardListener = {
 
               uv_timer_start(wd->key_repeat_timer_handle_,
                             cify([wd](uv_timer_t* handle) {
-                              wd->OnKeyboardKey(GDK_KEY_RELEASE, wd->last_hardware_keycode, wd->last_keysym, wd->last_keystate, wd->last_utf32);
-                              wd->OnKeyboardKey(GDK_KEY_PRESS, wd->last_hardware_keycode, wd->last_keysym, wd->last_keystate, wd->last_utf32);
+                              wd->application->keyboardKey(GDK_KEY_RELEASE, wd->last_hardware_keycode, wd->last_keysym, wd->last_keystate, wd->last_utf32);
+                              wd->application->keyboardKey(GDK_KEY_PRESS, wd->last_hardware_keycode, wd->last_keysym, wd->last_keystate, wd->last_utf32);
                             }),
                             wd->repeat_delay_, 1000 / wd->repeat_rate_);
             } else if (state == WL_KEYBOARD_KEY_STATE_RELEASED &&
@@ -280,7 +251,7 @@ const wl_keyboard_listener WaylandDisplay::kKeyboardListener = {
             }
           }
 
-          wd->OnKeyboardKey(type, hardware_keycode, keysym, state, utf32);
+          wd->application->keyboardKey(type, hardware_keycode, keysym, state, utf32);
         },
 
     .modifiers =
@@ -297,47 +268,6 @@ const wl_keyboard_listener WaylandDisplay::kKeyboardListener = {
       wd->repeat_delay_ = delay;
     },
 };
-
-void WaylandDisplay::OnKeyboardKey(const GdkEventType type, const xkb_keycode_t hardware_keycode, const xkb_keysym_t keysym, guint state, const uint32_t utf32)
-{
-  if (utf32) {
-    if (utf32 >= 0x21 && utf32 <= 0x7E) {
-      printf("the key %c was %s\n", (char)utf32, type == GDK_KEY_PRESS ? "pressed" : "released");
-    } else {
-      printf("the key U+%04X was %s\n", utf32, type == GDK_KEY_PRESS ? "pressed" : "released");
-    }
-  } else {
-    char name[64];
-    xkb_keysym_get_name(keysym, name, sizeof(name));
-
-    printf("the key %s was %s\n", name, type == GDK_KEY_PRESS ? "pressed" : "released");
-  }
-
-  std::string message;
-
-  // dw: if you do not like so many backslashes,
-  // please consider to rerwite it using RapidJson.
-  message += "{";
-  message += " \"type\":" + std::string(type == GDK_KEY_PRESS ? "\"keydown\"" : "\"keyup\"");
-  message += ",\"keymap\":" + std::string("\"linux\"");
-  message += ",\"scanCode\":" + std::to_string(hardware_keycode);
-  message += ",\"toolkit\":" + std::string("\"gtk\"");
-  message += ",\"keyCode\":" + std::to_string(keysym);
-  message += ",\"modifiers\":" + std::to_string(state);
-  if (utf32) {
-    message += ",\"unicodeScalarValues\":" + std::to_string(utf32);
-  }
-
-  message += "}";
-
-  if (!message.empty()) {
-    bool success = FlutterSendMessage(engine_, "flutter/keyevent", reinterpret_cast<const uint8_t *>(message.c_str()), message.size());
-
-    if (!success) {
-      FLWAY_ERROR << "Error sending PlatformMessage: " << message << std::endl;
-    }
-  }
-}
 
 const wl_seat_listener WaylandDisplay::kSeatListener = {
     .capabilities =
@@ -389,18 +319,9 @@ const wl_output_listener WaylandDisplay::kOutputListener = {
 
           printf("output.mode(data:%p, wl_output:%p, flags:%d, width:%d->%d, height:%d->%d, refresh:%d)\n", data, static_cast<void *>(wl_output), flags, wd->screen_width_, width, wd->screen_height_, height, refresh);
 
-          if (wd->engine_) {
-            FlutterWindowMetricsEvent event = {};
-            event.struct_size               = sizeof(event);
-            event.width                     = (wd->screen_width_ = width);
-            event.height                    = (wd->screen_height_ = height);
-            event.pixel_ratio               = get_pixel_ratio(wd->physical_width_, wd->physical_height_, wd->screen_width_, wd->screen_height_);
-
-            auto success = FlutterEngineSendWindowMetricsEvent(wd->engine_, &event) == kSuccess;
-
+          if (wd->application && wd->application->isStarted()) {
+            wd->application->sendWindowMetrics(wd->physical_width_, wd->physical_height_, (wd->screen_width_ = width), (wd->screen_height_ = height));
             wl_egl_window_resize(wd->window_, wd->screen_width_, wd->screen_height_, 0, 0);
-
-            FLWAY_LOG << "Window resized: " << event.width << "x" << event.height << " par: " << event.pixel_ratio << " status: " << (success ? "success" : "failed") << std::endl;
           } else {
             wd->window_metrix_skipped_ = true;
             FLWAY_LOG << "Window resized: " << wd->screen_width_ << "x" << wd->screen_width_ << " status: "
@@ -448,7 +369,7 @@ const struct wp_presentation_listener WaylandDisplay::kPresentationListener = {
         },
 };
 
-WaylandDisplay::WaylandDisplay(size_t width, size_t height, const std::string &bundle_path, const std::vector<std::string> &command_line_args)
+WaylandDisplay::WaylandDisplay(size_t width, size_t height)
     : xkb_context(xkb_context_new(XKB_CONTEXT_NO_FLAGS))
     , screen_width_(width)
     , screen_height_(height) {
@@ -484,16 +405,17 @@ WaylandDisplay::WaylandDisplay(size_t width, size_t height, const std::string &b
     FLWAY_ERROR << "Could not setup EGL." << std::endl;
     return;
   }
+}
 
-  if (!SetupEngine(bundle_path, command_line_args)) {
-    FLWAY_ERROR << "Could not setup Flutter Engine." << std::endl;
-    return;
+void WaylandDisplay::onEngineStarted() {
+  if (window_metrix_skipped_) {
+    application->sendWindowMetrics(physical_width_, physical_height_, screen_width_, screen_height_);
   }
 
   valid_ = true;
 }
 
-bool WaylandDisplay::SetupEngine(const std::string &bundle_path, const std::vector<std::string> &command_line_args) {
+FlutterRendererConfig WaylandDisplay::renderEngineConfig() {
   FlutterRendererConfig config = {};
   config.type                  = kOpenGL;
   config.open_gl.struct_size   = sizeof(config.open_gl);
@@ -561,103 +483,10 @@ bool WaylandDisplay::SetupEngine(const std::string &bundle_path, const std::vect
     return nullptr;
   };
 
-  auto icu_data_path = GetICUDataPath();
-
-  if (icu_data_path == "") {
-    return false;
-  }
-
-  std::vector<const char *> command_line_args_c;
-
-  for (const auto &arg : command_line_args) {
-    command_line_args_c.push_back(arg.c_str());
-  }
-
-  FlutterProjectArgs args = {
-      .struct_size       = sizeof(FlutterProjectArgs),
-      .assets_path       = bundle_path.c_str(),
-      .icu_data_path     = icu_data_path.c_str(),
-      .command_line_argc = static_cast<int>(command_line_args_c.size()),
-      .command_line_argv = command_line_args_c.data(),
-      .vsync_callback    = [](void *data, intptr_t baton) -> void {
-        WaylandDisplay *const wd = get_wayland_display(data);
-
-        if (wd->baton_ != 0) {
-          printf("ERROR: vsync.wait: New baton arrived, but old was not sent.\n");
-          exit(1);
-        }
-
-        wd->baton_ = baton;
-
-        if (wd->sendNotifyData() != 1) {
-          exit(1);
-        }
-      },
-      .compute_platform_resolved_locale_callback = [](const FlutterLocale **supported_locales, size_t number_of_locales) -> const FlutterLocale * {
-        printf("compute_platform_resolved_locale_callback: number_of_locales: %zu\n", number_of_locales);
-
-        if (number_of_locales > 0) {
-          return supported_locales[0];
-        }
-
-        return nullptr;
-      },
-  };
-
-  std::string libapp_aot_path = bundle_path + "/" + FlutterGetAppAotElfName(); // dw: TODO: There seems to be no convention name we could use, so let's temporary hardcode the path.
-
-  if (FlutterEngineRunsAOTCompiledDartCode()) {
-    FLWAY_LOG << "Using AOT precompiled runtime." << std::endl;
-
-    if (std::ifstream(libapp_aot_path)) {
-      FLWAY_LOG << "Lading AOT snapshot: " << libapp_aot_path << std::endl;
-
-      const char *error;
-      auto handle = Aot_LoadELF(libapp_aot_path.c_str(), 0, &error, &args.vm_snapshot_data, &args.vm_snapshot_instructions, &args.isolate_snapshot_data, &args.isolate_snapshot_instructions);
-
-      if (!handle) {
-        FLWAY_ERROR << "Could not load AOT library: " << libapp_aot_path << " (error: " << error << ")" << std::endl;
-        return false;
-      }
-    }
-  }
-
-  auto result = FlutterEngineRun(FLUTTER_ENGINE_VERSION, &config, &args, this /* userdata */, &engine_);
-
-  if (result != kSuccess) {
-    FLWAY_ERROR << "Could not run the Flutter engine" << std::endl;
-    return false;
-  }
-
-  if (window_metrix_skipped_) {
-    FlutterWindowMetricsEvent event = {};
-
-    event.struct_size = sizeof(event);
-    event.width       = screen_width_;
-    event.height      = screen_height_;
-    event.pixel_ratio = get_pixel_ratio(physical_width_, physical_height_, screen_width_, screen_height_);
-
-    const auto success = FlutterEngineSendWindowMetricsEvent(engine_, &event) == kSuccess;
-
-    FLWAY_LOG << "Window metric: " << event.width << "x" << event.height << " par: " << event.pixel_ratio << " status: " << (success ? "success" : "failed") << std::endl;
-
-    return success;
-  }
-
-  return true;
+  return config;
 }
 
 WaylandDisplay::~WaylandDisplay() {
-
-  if (engine_) {
-    auto result = FlutterEngineShutdown(engine_);
-    if (result == kSuccess) {
-      engine_ = nullptr;
-    } else {
-      FLWAY_ERROR << "Could not shutdown the Flutter engine." << std::endl;
-    }
-  }
-
   if (shell_surface_) {
     wl_shell_surface_destroy(shell_surface_);
     shell_surface_ = nullptr;
@@ -715,6 +544,20 @@ WaylandDisplay::~WaylandDisplay() {
   }
 }
 
+void WaylandDisplay::vsync_callback(void *data, intptr_t baton)
+{
+  if (baton_ != 0) {
+    printf("ERROR: vsync.wait: New baton arrived, but old was not sent.\n");
+    exit(1);
+  }
+
+  baton_ = baton;
+
+  if (sendNotifyData() != 1) {
+    exit(1);
+  }
+}
+
 bool WaylandDisplay::IsValid() const {
   return valid_;
 }
@@ -724,14 +567,14 @@ ssize_t WaylandDisplay::vSyncHandler() {
     return 0;
   }
 
-  const auto t_now_ns                      = FlutterEngineGetCurrentTime();
+  const auto t_now_ns                      = application->getCurrentTime();
   const uint64_t after_vsync_time_ns       = (t_now_ns - last_frame_) % vblank_time_ns_;
   const uint64_t before_next_vsync_time_ns = vblank_time_ns_ - after_vsync_time_ns;
   const uint64_t current_ns                = t_now_ns + before_next_vsync_time_ns;
   const uint64_t finish_time_ns            = current_ns + vblank_time_ns_;
   intptr_t baton                           = baton_.exchange(0);
 
-  const auto status = FlutterEngineOnVsync(engine_, baton, current_ns, finish_time_ns);
+  const auto status = application->onVsync(baton, current_ns, finish_time_ns);
 
   if (status != kSuccess) {
     printf("[%ju]: ERROR: vsync.ntfy: FlutterEngineOnVsync failed(%d): baton: %p\n", t_now_ns, status, reinterpret_cast<void *>(baton));
@@ -749,7 +592,7 @@ const struct wl_callback_listener WaylandDisplay::kFrameListener = {.done = [](v
     return;
   }
 
-  wd->last_frame_ = FlutterEngineGetCurrentTime();
+  wd->last_frame_ = wd->application->getCurrentTime();
   wl_callback_destroy(cb);
   wl_callback_add_listener(wl_surface_frame(wd->surface_), &kFrameListener, data);
 }};

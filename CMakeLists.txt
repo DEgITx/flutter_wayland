@@ -37,6 +37,7 @@ set(SOURCES
     src/egl_utils.cc
     src/utils.cc
     src/wayland_display.cc
+    src/flutter_application.cc
     src/cify.h
     src/elf.h
     src/macros.h
@@ -44,6 +45,7 @@ set(SOURCES
     src/utils.h
     src/egl_utils.h
     src/wayland_display.h
+    src/flutter_application.h
 )
 
 ecm_add_wayland_client_protocol(

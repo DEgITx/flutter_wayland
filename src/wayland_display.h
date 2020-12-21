@@ -10,9 +10,6 @@
 #include <EGL/egl.h>
 #include <wayland-client.h>
 #include <wayland-egl.h>
-#include <gdk/gdk.h>
-#include <xkbcommon/xkbcommon.h>
-#include <flutter_embedder.h>
 
 #include <memory>
 #include <string>
@@ -25,18 +22,22 @@
 #include <uv.h>
 
 #include "macros.h"
+#include "flutter_application.h"
 
 namespace flutter {
 
-class WaylandDisplay {
+class WaylandDisplay : public RenderDisplay {
 public:
-  WaylandDisplay(size_t width, size_t height, const std::string &bundle_path, const std::vector<std::string> &args);
+  WaylandDisplay(size_t width, size_t height);
 
   ~WaylandDisplay();
 
   bool IsValid() const;
-
+  void onEngineStarted() override;
+  void vsync_callback(void *data, intptr_t baton) override;
   bool Run();
+
+  FlutterRendererConfig renderEngineConfig() override;
 
 private:
   static const wl_registry_listener kRegistryListener;
@@ -84,11 +85,7 @@ private:
   EGLSurface resource_egl_surface_ = nullptr;
   EGLContext resource_egl_context_ = EGL_NO_CONTEXT;
 
-  FlutterEngine engine_ = nullptr;
-
   bool SetupEGL();
-
-  bool SetupEngine(const std::string &bundle_path, const std::vector<std::string> &command_line_args);
 
   bool StopRunning();
 
@@ -124,7 +121,6 @@ private:
   void ProcessNotifyEvents(uv_poll_t* handle,
                                           int status,
                                           int events);
-  void OnKeyboardKey(const GdkEventType type, const xkb_keycode_t hardware_keycode, const xkb_keysym_t keysym, guint state, const uint32_t utf32);
 
   FLWAY_DISALLOW_COPY_AND_ASSIGN(WaylandDisplay)
 };

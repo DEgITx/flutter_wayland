@@ -63,7 +63,12 @@ static bool Main(std::vector<std::string> args) {
     FLWAY_LOG << "Flutter arg: " << arg << std::endl;
   }
 
-  WaylandDisplay display(kWidth, kHeight, asset_bundle_path, flutter_args);
+  WaylandDisplay display(kWidth, kHeight);
+  FlutterApplication flutter(&display, asset_bundle_path, flutter_args);
+  if(!flutter.isStarted()) {
+    FLWAY_ERROR << "Could not run the Flutter application" << std::endl;
+    return false;
+  }
 
   if (!display.IsValid()) {
     FLWAY_ERROR << "Wayland display was not valid." << std::endl;
