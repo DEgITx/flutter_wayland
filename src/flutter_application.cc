@@ -22,7 +22,7 @@ FlutterApplication::FlutterApplication(RenderDisplay* display, const std::string
       auto icu_data_path = GetICUDataPath();
 
       if (icu_data_path == "") {
-        printf("Error: no icu_data_path\n");
+        FL_ERROR("Error: no icu_data_path");
         return;
       }
 
@@ -40,7 +40,7 @@ FlutterApplication::FlutterApplication(RenderDisplay* display, const std::string
         .command_line_argv = command_line_args_c.data(),
         .vsync_callback    = cify([display](void *data, intptr_t baton){ display->vsync_callback(data, baton); }),
         .compute_platform_resolved_locale_callback = [](const FlutterLocale **supported_locales, size_t number_of_locales) -> const FlutterLocale * {
-          printf("compute_platform_resolved_locale_callback: number_of_locales: %zu\n", number_of_locales);
+          FL_DEBUG("compute_platform_resolved_locale_callback: number_of_locales: %zu", number_of_locales);
 
           if (number_of_locales > 0) {
             return supported_locales[0];
@@ -53,16 +53,16 @@ FlutterApplication::FlutterApplication(RenderDisplay* display, const std::string
     std::string libapp_aot_path = bundle_path + "/" + FlutterGetAppAotElfName(); // dw: TODO: There seems to be no convention name we could use, so let's temporary hardcode the path.
 
     if (FlutterEngineRunsAOTCompiledDartCode()) {
-        FLWAY_LOG << "Using AOT precompiled runtime." << std::endl;
+        FL_INFO("Using AOT precompiled runtime.");
 
         if (std::ifstream(libapp_aot_path)) {
-            FLWAY_LOG << "Loading AOT snapshot: " << libapp_aot_path << std::endl;
+            FL_INFO("Loading AOT snapshot: %s", libapp_aot_path.c_str());
 
             const char *error;
             auto handle = Aot_LoadELF(libapp_aot_path.c_str(), 0, &error, &args.vm_snapshot_data, &args.vm_snapshot_instructions, &args.isolate_snapshot_data, &args.isolate_snapshot_instructions);
 
             if (!handle) {
-                FLWAY_ERROR << "Could not load AOT library: " << libapp_aot_path << " (error: " << error << ")" << std::endl;
+                FL_ERROR("Could not load AOT library: %s error: %s", libapp_aot_path.c_str(), error);
                 return;
             }
         }
@@ -71,7 +71,7 @@ FlutterApplication::FlutterApplication(RenderDisplay* display, const std::string
     auto result = FlutterEngineRun(FLUTTER_ENGINE_VERSION, &config, &args, display /* userdata */, &engine_);
 
     if (result != kSuccess) {
-        FLWAY_ERROR << "Could not run the Flutter engine" << std::endl;
+        FL_ERROR("Could not run the Flutter engine");
         engine_ = nullptr;
         return;
     }
@@ -85,7 +85,7 @@ FlutterApplication::~FlutterApplication() {
         if (result == kSuccess) {
             engine_ = nullptr;
         } else {
-            FLWAY_ERROR << "Could not shutdown the Flutter engine." << std::endl;
+            FL_ERROR("Could not shutdown the Flutter engine.");
         }
     }
 }
@@ -105,7 +105,7 @@ bool FlutterApplication::sendWindowMetrics(int32_t physical_width, int32_t physi
 
     auto success = FlutterEngineSendWindowMetricsEvent(engine_, &event) == kSuccess;
 
-    FLWAY_LOG << "flutter window metric: " << event.width << "x" << event.height << " par: " << event.pixel_ratio << " status: " << (success ? "success" : "failed") << std::endl;
+    FL_DEBUG("flutter window metric: %zux%zu par: %f status: %s", event.width, event.height, event.pixel_ratio, (success ? "success" : "failed"));
 
     return success;
 }
@@ -114,15 +114,15 @@ void FlutterApplication::keyboardKey(const GdkEventType type, const xkb_keycode_
 {
   if (utf32) {
     if (utf32 >= 0x21 && utf32 <= 0x7E) {
-      printf("the key %c was %s\n", (char)utf32, type == GDK_KEY_PRESS ? "pressed" : "released");
+      FL_DEBUG("the key %c was %s", (char)utf32, type == GDK_KEY_PRESS ? "pressed" : "released");
     } else {
-      printf("the key U+%04X was %s\n", utf32, type == GDK_KEY_PRESS ? "pressed" : "released");
+      FL_DEBUG("the key U+%04X was %s", utf32, type == GDK_KEY_PRESS ? "pressed" : "released");
     }
   } else {
     char name[64];
     xkb_keysym_get_name(keysym, name, sizeof(name));
 
-    printf("the key %s was %s\n", name, type == GDK_KEY_PRESS ? "pressed" : "released");
+    FL_DEBUG("the key %s was %s", name, type == GDK_KEY_PRESS ? "pressed" : "released");
   }
 
   std::string message;
@@ -146,7 +146,7 @@ void FlutterApplication::keyboardKey(const GdkEventType type, const xkb_keycode_
     bool success = FlutterSendMessage(engine_, "flutter/keyevent", reinterpret_cast<const uint8_t *>(message.c_str()), message.size());
 
     if (!success) {
-      FLWAY_ERROR << "Error sending PlatformMessage: " << message << std::endl;
+      FL_ERROR("Error sending PlatformMessage: %s", message.c_str());
     }
   }
 }

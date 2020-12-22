@@ -33,12 +33,12 @@ void LogLastEGLError() {
 
   for (size_t i = 0; i < count; i++) {
     if (last_error == pairs[i].code) {
-      FLWAY_ERROR << "EGL Error: " << pairs[i].name << " (" << pairs[i].code << ")" << std::endl;
+      FL_ERROR("EGL Error: %s (%d)", pairs[i].name, pairs[i].code);
       return;
     }
   }
 
-  FLWAY_ERROR << "Unknown EGL Error" << std::endl;
+  FL_ERROR("Unknown EGL Error");
 }
 
 } // namespace flutter

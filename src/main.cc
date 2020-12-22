@@ -41,7 +41,7 @@ asset_bundle_path: The Flutter application code needs to be snapshotted using
 
 static bool Main(std::vector<std::string> args) {
   if (args.size() == 1) {
-    std::cerr << "   <Invalid Arguments>   " << std::endl;
+    FL_ERROR("<Invalid Arguments>");
     PrintUsage();
     return false;
   }
@@ -49,7 +49,7 @@ static bool Main(std::vector<std::string> args) {
   const auto asset_bundle_path = args[1];
 
   if (!FlutterAssetBundleIsValid(asset_bundle_path)) {
-    std::cerr << "   <Invalid Flutter Asset Bundle>   " << std::endl;
+    FL_ERROR("<Invalid Flutter Asset Bundle>");
     PrintUsage();
     return false;
   }
@@ -60,18 +60,18 @@ static bool Main(std::vector<std::string> args) {
   const std::vector<std::string> flutter_args(args.begin() + 1, args.end());
 
   for (const auto &arg : flutter_args) {
-    FLWAY_LOG << "Flutter arg: " << arg << std::endl;
+    FL_INFO("Flutter arg: %s", arg.c_str());
   }
 
   WaylandDisplay display(kWidth, kHeight);
   FlutterApplication flutter(&display, asset_bundle_path, flutter_args);
   if(!flutter.isStarted()) {
-    FLWAY_ERROR << "Could not run the Flutter application" << std::endl;
+    FL_ERROR("Could not run the Flutter application.");
     return false;
   }
 
   if (!display.IsValid()) {
-    FLWAY_ERROR << "Wayland display was not valid." << std::endl;
+    FL_ERROR("Wayland display was not valid.");
     return false;
   }
 
@@ -92,9 +92,9 @@ int main(int argc, char *argv[]) {
   }
   bool status = flutter::Main(std::move(args));
   if(status) {
-    printf("application closed succesfully\n");
+    FL_INFO("application closed succesfully");
   } else {
-    FLWAY_ERROR << "application closed with error" << std::endl;
+    FL_ERROR("application closed with error");
   }
   return status ? EXIT_SUCCESS : EXIT_FAILURE;
 }
