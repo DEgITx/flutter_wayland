@@ -89,10 +89,10 @@ target_include_directories(flutter-launcher-wayland
 
 target_link_libraries(flutter-launcher-wayland
   ${CMAKE_DL_LIBS}
-  ${XKB_LIBRARIES}
-  ${EGL_LIBRARIES}
   ${WAYLAND_CLIENT_LIBRARIES}
   ${WAYLAND_EGL_LIBRARIES}
+  ${XKB_LIBRARIES}
+  ${EGL_LIBRARIES}
   ${FLUTTER_ENGINE_LIBRARIES}
   ${UV_LIBRARIES}
   ${EXTERNAL_LIBRARIES}
